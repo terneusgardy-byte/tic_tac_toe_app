@@ -150,6 +150,13 @@ TTT_HTML = """
       border-color: #fbbf24;
     }
 
+    /* Winning cells in LIGHT mode */
+    body.light-mode .cell.winning {
+      background: radial-gradient(circle, #fde047 0, #fb923c 45%, #f97316 70%, #fefce8 100%);
+      border-color: #fbbf24;
+      box-shadow: 0 0 24px rgba(249, 115, 22, 0.55);
+    }
+
     .controls {
       display: flex;
       justify-content: space-between;
