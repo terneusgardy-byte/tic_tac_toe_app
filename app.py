@@ -225,6 +225,52 @@ TTT_HTML = """
       font-weight: 500;
     }
 
+    /* Light mode overrides */
+    body.light-mode {
+      background: radial-gradient(circle at top, #e5e7eb 0, #f9fafb 60%);
+      color: #020617;
+    }
+
+    body.light-mode .wrap {
+      background: linear-gradient(145deg, #ffffff, #e5e7eb);
+      box-shadow:
+        0 16px 35px rgba(148,163,184,0.55),
+        0 0 0 1px rgba(148,163,184,0.35);
+    }
+
+    body.light-mode .status {
+      background: rgba(248,250,252,0.95);
+      border-color: rgba(148,163,184,0.6);
+    }
+
+    body.light-mode .message {
+      color: #6b7280;
+    }
+
+    body.light-mode .cell {
+      background: radial-gradient(circle at top, #f9fafb, #e5e7eb);
+      border-color: #e5e7eb;
+      box-shadow: none;
+    }
+
+    body.light-mode .cell:hover {
+      box-shadow: 0 8px 14px rgba(148,163,184,0.6);
+      border-color: #cbd5f5;
+    }
+
+    body.light-mode .btn-ghost {
+      color: #4b5563;
+      border-color: rgba(148,163,184,0.9);
+    }
+
+    body.light-mode .subtitle,
+    body.light-mode .scoreboard,
+    body.light-mode .score-draw,
+    body.light-mode .score-x,
+    body.light-mode .score-o {
+      color: #374151;
+    }
+
     @media (max-width: 480px) {
       .wrap {
         border-radius: 18px;
@@ -244,6 +290,13 @@ TTT_HTML = """
   <div class="wrap">
     <div class="title">Tic Tac Toe 🎮</div>
     <div class="subtitle">Two players · Local game · First to 3 wins? ⭐</div>
+
+    <!-- Theme toggle -->
+    <div style="text-align: right; margin-bottom: 12px;">
+      <button id="themeToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem;">
+        ☀️ Light
+      </button>
+    </div>
 
     <div class="status">
       <div class="turn" id="turnText">
@@ -295,6 +348,7 @@ TTT_HTML = """
     const scoreXEl = document.getElementById("scoreX");
     const scoreOEl = document.getElementById("scoreO");
     const scoreDrawEl = document.getElementById("scoreDraw");
+    const themeToggleBtn = document.getElementById("themeToggle");
 
     let board = Array(9).fill(null);
     let current = "X";
@@ -405,6 +459,27 @@ TTT_HTML = """
     );
     resetBtn.addEventListener("click", resetBoard);
     clearScoreBtn.addEventListener("click", clearScores);
+
+    // Theme toggle (dark / light) with localStorage
+    function applyTheme(mode) {
+      const body = document.body;
+      if (mode === "light") {
+        body.classList.add("light-mode");
+        themeToggleBtn.textContent = "🌙 Dark";
+      } else {
+        body.classList.remove("light-mode");
+        themeToggleBtn.textContent = "☀️ Light";
+      }
+      localStorage.setItem("ttt_theme", mode);
+    }
+
+    const storedTheme = localStorage.getItem("ttt_theme") || "dark";
+    applyTheme(storedTheme);
+
+    themeToggleBtn.addEventListener("click", () => {
+      const isLight = document.body.classList.contains("light-mode");
+      applyTheme(isLight ? "dark" : "light");
+    });
 
     // initial UI state
     setTurnDisplay();
