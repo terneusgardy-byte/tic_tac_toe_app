@@ -64,6 +64,10 @@
       </button>
     </div>
 
+    <!-- Win crown + clap burst -->
+    <div id="winCrown" class="crown hidden">👑</div>
+    <div id="clapBurst" class="clap-container hidden"></div>
+
     <div class="scoreboard">
       <div class="score-x" id="scoreX">X wins: 0</div>
       <div class="score-o" id="scoreO">O wins: 0</div>
@@ -72,7 +76,12 @@
   </div>
 
   <!-- Win sound (applause) -->
-  <audio id="winSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3"></audio>
+  <audio
+    id="winSound"
+    preload="auto"
+    playsinline
+    src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3">
+  </audio>
 
   <!-- Confetti library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
