@@ -17,6 +17,8 @@ const modePvcBtn = document.getElementById("mode-pvc");
 const difficultyRow = document.getElementById("difficultyRow");
 const diffButtons = Array.from(document.querySelectorAll(".diff-btn"));
 
+const avToggleBtn = document.getElementById("avToggle");
+
 let board = Array(9).fill(null);
 let current = "X";
 let gameOver = false;
@@ -45,9 +47,41 @@ const WIN_LINES = [
   [2, 4, 6],
 ];
 
+/* ---------- SOUND / VIBRATE MODE (single button) ---------- */
+// Modes:
+// "sound_on"  -> sound + voice + vibrate
+// "sound_off" -> no sound, no voice, no vibrate
+// "vibrate"   -> no sound/voice, vibrate only
+const AV_MODES = ["sound_on", "sound_off", "vibrate"];
+let avMode = localStorage.getItem("ttt_av_mode") || "sound_on";
+
+function isSoundEnabled() {
+  return avMode === "sound_on";
+}
+
+function isVibrateEnabled() {
+  return avMode === "sound_on" || avMode === "vibrate";
+}
+
+function saveAvMode() {
+  localStorage.setItem("ttt_av_mode", avMode);
+}
+
+function updateAvUI() {
+  if (!avToggleBtn) return;
+  if (avMode === "sound_on") {
+    avToggleBtn.textContent = "🔊 SOUND ON";
+  } else if (avMode === "sound_off") {
+    avToggleBtn.textContent = "🔕 SOUND OFF";
+  } else {
+    avToggleBtn.textContent = "📳 VIBRATE";
+  }
+}
+
 /* ---------- AUDIO + VIBRATION ---------- */
 
 function vibrate() {
+  if (!isVibrateEnabled()) return;
   if (navigator.vibrate) {
     navigator.vibrate([25]);
   }
@@ -72,6 +106,7 @@ function getAudioCtx() {
 // Speech helper
 function speak(text) {
   try {
+    if (!isSoundEnabled()) return;
     if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
@@ -89,6 +124,8 @@ function speak(text) {
  * - Around 2s total
  */
 function playWinSound() {
+  if (!isSoundEnabled()) return;
+
   const ctx = getAudioCtx();
   if (!ctx) return;
 
@@ -307,7 +344,6 @@ function finishGame(result) {
     if (winner === "X") scoreX++;
     if (winner === "O") scoreO++;
 
-    // 🔊 Only big stadium crowd
     playWinSound();          // stadium crowd roar + claps
     launchConfetti();        // confetti
     showCrown();             // 👑 crown animation
@@ -388,9 +424,6 @@ function clearScores() {
 function handleClick(e) {
   const cell = e.target;
   const idx = Number(cell.getAttribute("data-idx"));
-
-  // 🔑 Unlock / resume AudioContext on a REAL user tap
-  getAudioCtx();
 
   if (gameOver || board[idx] !== null) return;
 
@@ -520,6 +553,16 @@ cells.forEach((cell) => cell.addEventListener("click", handleClick));
 resetBtn.addEventListener("click", resetBoard);
 clearScoreBtn.addEventListener("click", clearScores);
 
+if (avToggleBtn) {
+  avToggleBtn.addEventListener("click", () => {
+    const idx = AV_MODES.indexOf(avMode);
+    const nextIdx = (idx + 1) % AV_MODES.length;
+    avMode = AV_MODES[nextIdx];
+    saveAvMode();
+    updateAvUI();
+  });
+}
+
 /* ---------- THEME ---------- */
 
 function applyTheme(mode) {
@@ -545,3 +588,4 @@ themeToggleBtn.addEventListener("click", () => {
 /* ---------- INIT ---------- */
 setTurnDisplay();
 updateScoresDisplay();
+updateAvUI();
