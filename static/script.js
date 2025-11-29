@@ -53,6 +53,43 @@ function vibrate() {
   }
 }
 
+// Shared AudioContext for all custom sounds
+let audioCtx = null;
+let audioPrimed = false;
+
+function getAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+
+  if (!audioCtx) {
+    audioCtx = new AC();
+  }
+
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+// One-time tiny silent sound to "unlock" audio on stricter browsers (Render)
+function primeAudio() {
+  if (audioPrimed) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  audioPrimed = true;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime); // effectively silent
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.02);
+}
+
 // Speech helper
 function speak(text) {
   try {
@@ -66,35 +103,101 @@ function speak(text) {
   } catch (e) {}
 }
 
-// Win sound (applause from <audio>)
+/**
+ * Stadium crowd mix:
+ * - Wide "roar" noise with light echo
+ * - Random clap bursts on top
+ * - Around 2s total
+ */
 function playWinSound() {
-  const snd = document.getElementById("winSound");
-  if (!snd) return;
-  snd.currentTime = 0;
-  snd.play().catch(() => {});
-}
+  const ctx = getAudioCtx();
+  if (!ctx) return;
 
-// EXTRA celebration sound (simple rising sweep)
-function playExtraCelebrationSound() {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return;
+  const now = ctx.currentTime;
 
-  const ctx = new AudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  // Master gain to control global volume + fade out
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0.95, now);
+  masterGain.gain.linearRampToValueAtTime(0.0001, now + 2.1);
+  masterGain.connect(ctx.destination);
 
-  osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(350, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.7);
+  /* --- 1) CROWD ROAR (background) --- */
+  const roarDuration = 2.0;
+  const roarBufferSize = Math.floor(ctx.sampleRate * roarDuration);
+  const roarBuffer = ctx.createBuffer(1, roarBufferSize, ctx.sampleRate);
+  const roarData = roarBuffer.getChannelData(0);
 
-  gain.gain.setValueAtTime(0.18, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.85);
+  for (let i = 0; i < roarBufferSize; i++) {
+    // Smoothish noise for "roar"
+    roarData[i] = (Math.random() * 2 - 1) * 0.5;
+  }
 
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+  const roarSource = ctx.createBufferSource();
+  roarSource.buffer = roarBuffer;
 
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.9);
+  const roarFilter = ctx.createBiquadFilter();
+  roarFilter.type = "bandpass";
+  roarFilter.frequency.value = 700; // mid crowd band
+  roarFilter.Q.value = 0.9;
+
+  const roarGain = ctx.createGain();
+  roarGain.gain.setValueAtTime(0.8, now);
+
+  // Simple echo / reverb with feedback
+  const delay = ctx.createDelay();
+  delay.delayTime.value = 0.09; // 90 ms "stadium slap"
+
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.35; // how strong the echo bounces
+
+  roarSource.connect(roarFilter);
+  roarFilter.connect(roarGain);
+
+  // Dry
+  roarGain.connect(masterGain);
+  // Wet (echo)
+  roarGain.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(masterGain);
+
+  roarSource.start(now);
+  roarSource.stop(now + roarDuration);
+
+  /* --- 2) CLAP BURSTS (foreground pops) --- */
+  const hits = 14;
+  for (let i = 0; i < hits; i++) {
+    const t = now + 0.2 + Math.random() * 1.0; // spread over ~1.2s
+
+    const clapDuration = 0.2;
+    const clapBufferSize = Math.floor(ctx.sampleRate * clapDuration);
+    const clapBuffer = ctx.createBuffer(1, clapBufferSize, ctx.sampleRate);
+    const clapData = clapBuffer.getChannelData(0);
+
+    for (let j = 0; j < clapBufferSize; j++) {
+      // Sharper noise for clap transient
+      clapData[j] = (Math.random() * 2 - 1);
+    }
+
+    const clapSource = ctx.createBufferSource();
+    clapSource.buffer = clapBuffer;
+
+    const clapFilter = ctx.createBiquadFilter();
+    clapFilter.type = "bandpass";
+    clapFilter.frequency.value = 1500 + Math.random() * 1000; // bright
+    clapFilter.Q.value = 2.0;
+
+    const clapGain = ctx.createGain();
+    clapGain.gain.setValueAtTime(0.7, t);
+    clapGain.gain.exponentialRampToValueAtTime(0.001, t + clapDuration);
+
+    clapSource.connect(clapFilter);
+    clapFilter.connect(clapGain);
+    clapGain.connect(masterGain);
+
+    clapSource.start(t);
+    clapSource.stop(t + clapDuration + 0.05);
+  }
 }
 
 // Confetti
@@ -225,13 +328,55 @@ function finishGame(result) {
     if (winner === "X") scoreX++;
     if (winner === "O") scoreO++;
 
-    playWinSound();
-    playExtraCelebrationSound();
-    launchConfetti();
+    // 🔊 Only big stadium crowd
+    playWinSound();          // stadium crowd roar + claps
+    launchConfetti();        // confetti
+    showCrown();             // 👑 crown animation
+    clapBurst();             // 👏 emojis falling
     speak(`Congratulations! Player ${winner} wins!`);
   }
 
   updateScoresDisplay();
+}
+
+function showCrown() {
+  const crownEl = document.getElementById("winCrown");
+  if (!crownEl) return;
+
+  crownEl.classList.remove("hidden");
+  void crownEl.offsetWidth; // Reset animation
+  crownEl.classList.add("active");
+
+  setTimeout(() => {
+    crownEl.classList.remove("active");
+    crownEl.classList.add("hidden");
+  }, 2500);
+}
+
+function clapBurst() {
+  const container = document.getElementById("clapBurst");
+  if (!container) return;
+
+  container.innerHTML = "";
+  container.classList.remove("hidden");
+
+  const count = 8;
+  for (let i = 0; i < count; i++) {
+    const clap = document.createElement("div");
+    clap.classList.add("clap");
+    clap.textContent = "👏";
+
+    const left = 10 + Math.random() * 80;
+    clap.style.left = left + "%";
+    clap.style.animationDelay = (Math.random() * 0.3) + "s";
+
+    container.appendChild(clap);
+  }
+
+  setTimeout(() => {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+  }, 1600);
 }
 
 function resetBoard() {
@@ -266,6 +411,9 @@ function handleClick(e) {
   const idx = Number(cell.getAttribute("data-idx"));
 
   if (gameOver || board[idx] !== null) return;
+
+  // First real tap unlocks audio for Render / strict browsers
+  primeAudio();
 
   /* ---------- PVP ---------- */
   if (gameMode === "pvp") {
