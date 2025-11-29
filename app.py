@@ -69,7 +69,7 @@ TTT_HTML = """
       display: flex;
       justify-content: center;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .mode-btn {
@@ -92,6 +92,47 @@ TTT_HTML = """
       color: white;
       border-color: transparent;
       box-shadow: 0 8px 20px rgba(34, 197, 94, 0.55);
+    }
+
+    /* difficulty row (only for Vs Computer) */
+    .difficulty-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+    }
+
+    .difficulty-label {
+      opacity: 0.9;
+    }
+
+    .diff-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.9);
+      color: var(--text-sub);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .diff-btn:hover {
+      box-shadow: 0 5px 12px rgba(15,23,42,0.9);
+    }
+
+    .diff-active {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 6px 16px rgba(34,197,94,0.55);
+    }
+
+    .hidden {
+      display: none;
     }
 
     .status {
@@ -320,6 +361,17 @@ TTT_HTML = """
       box-shadow: 0 8px 18px rgba(34, 197, 94, 0.5);
     }
 
+    body.light-mode .diff-btn {
+      background: #f9fafb;
+      color: #4b5563;
+    }
+
+    body.light-mode .diff-active {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      box-shadow: 0 6px 16px rgba(34,197,94,0.5);
+    }
+
     @media (max-width: 480px) {
       .wrap {
         border-radius: 18px;
@@ -343,6 +395,14 @@ TTT_HTML = """
     <div class="mode-toggle">
       <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
       <button id="mode-pvc" class="mode-btn">Vs Computer</button>
+    </div>
+
+    <!-- Difficulty (only visible in Vs Computer) -->
+    <div id="difficultyRow" class="difficulty-row hidden">
+      <span class="difficulty-label">Difficulty:</span>
+      <button class="diff-btn diff-active" data-level="easy">Easy</button>
+      <button class="diff-btn" data-level="normal">Normal</button>
+      <button class="diff-btn" data-level="hard">Hard</button>
     </div>
 
     <!-- Theme toggle -->
@@ -388,15 +448,9 @@ TTT_HTML = """
       <div class="score-o" id="scoreO">O wins: 0</div>
       <div class="score-draw" id="scoreDraw">Draws: 0</div>
     </div>
-
-    <div style="margin-top:16px; text-align:center;">
-      <button id="soundTestBtn" class="btn btn-ghost">
-        🔊 Test Game Sound
-      </button>
-    </div>
   </div>
 
-  <!-- Win sound: crowd applause -->
+  <!-- Win sound (applause) -->
   <audio id="winSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3"></audio>
 
   <!-- Confetti library -->
@@ -410,7 +464,6 @@ TTT_HTML = """
     const messageText = document.getElementById("messageText");
     const resetBtn = document.getElementById("resetBtn");
     const clearScoreBtn = document.getElementById("clearScoreBtn");
-    const soundTestBtn = document.getElementById("soundTestBtn");
 
     const scoreXEl = document.getElementById("scoreX");
     const scoreOEl = document.getElementById("scoreO");
@@ -419,6 +472,9 @@ TTT_HTML = """
 
     const modePvpBtn = document.getElementById("mode-pvp");
     const modePvcBtn = document.getElementById("mode-pvc");
+
+    const difficultyRow = document.getElementById("difficultyRow");
+    const diffButtons = Array.from(document.querySelectorAll(".diff-btn"));
 
     let board = Array(9).fill(null);
     let current = "X";
@@ -434,6 +490,9 @@ TTT_HTML = """
     let computerPlayer = "O";
     let isHumanTurn = true;
 
+    // difficulty: "easy" | "normal" | "hard"
+    let difficulty = "easy";
+
     const WIN_LINES = [
       [0, 1, 2],
       [3, 4, 5],
@@ -447,37 +506,9 @@ TTT_HTML = """
 
     /* ------------------- AUDIO + VIBRATION ------------------- */
 
-    let audioCtx = null;
-    function getAudioCtx() {
-      if (!audioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return null;
-        audioCtx = new Ctx();
-      }
-      return audioCtx;
-    }
-
-    function playClick(player) {
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "triangle";
-      osc.frequency.value = player === "X" ? 520 : 420;
-      gain.gain.value = 0.08;
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      const now = ctx.currentTime;
-      osc.start(now);
-      osc.stop(now + 0.06);
-    }
-
     function vibrate() {
       if (navigator.vibrate) {
-        navigator.vibrate([30]);
+        navigator.vibrate([25]);
       }
     }
 
@@ -502,6 +533,29 @@ TTT_HTML = """
       snd.play().catch(() => {});
     }
 
+    // EXTRA celebration sound (simple rising sweep)
+    function playExtraCelebrationSound() {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(350, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.7);
+
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.85);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.9);
+    }
+
     // Confetti
     function launchConfetti() {
       if (typeof confetti !== "function") return;
@@ -522,7 +576,7 @@ TTT_HTML = """
       })();
     }
 
-    /* ---------------------------------------------------------- */
+    /* ------------------- CORE HELPERS ------------------- */
 
     function setTurnDisplay() {
       turnBadge.textContent = current;
@@ -552,6 +606,68 @@ TTT_HTML = """
       return null;
     }
 
+    // For AI: evaluate an arbitrary board state
+    function evaluateBoard(state) {
+      for (const [a, b, c] of WIN_LINES) {
+        if (state[a] && state[a] === state[b] && state[a] === state[c]) {
+          return state[a]; // 'X' or 'O'
+        }
+      }
+      if (state.every(v => v !== null)) return "draw";
+      return null;
+    }
+
+    function getRandomMove() {
+      const empty = [];
+      for (let i = 0; i < 9; i++) {
+        if (board[i] === null) empty.push(i);
+      }
+      if (!empty.length) return null;
+      const idx = Math.floor(Math.random() * empty.length);
+      return empty[idx];
+    }
+
+    // Minimax for HARD mode
+    function minimax(state, player) {
+      const winner = evaluateBoard(state);
+      if (winner === computerPlayer) return { score: 10 };
+      if (winner === humanPlayer) return { score: -10 };
+      if (winner === "draw") return { score: 0 };
+
+      const isMaximizing = (player === computerPlayer);
+      let best = { score: isMaximizing ? -Infinity : Infinity, index: null };
+
+      for (let i = 0; i < 9; i++) {
+        if (state[i] === null) {
+          state[i] = player;
+          const result = minimax(state, player === "X" ? "O" : "X");
+          state[i] = null;
+
+          if (isMaximizing) {
+            if (result.score > best.score) {
+              best = { score: result.score, index: i };
+            }
+          } else {
+            if (result.score < best.score) {
+              best = { score: result.score, index: i };
+            }
+          }
+        }
+      }
+      return best;
+    }
+
+    function getSmartMove() {
+      const copy = board.slice();
+      const result = minimax(copy, computerPlayer);
+      if (result && result.index !== null && result.index !== undefined) {
+        return result.index;
+      }
+      return getRandomMove();
+    }
+
+    /* ------------------- GAME FLOW ------------------- */
+
     function finishGame(result) {
       if (!result) return;
       gameOver = true;
@@ -568,8 +684,9 @@ TTT_HTML = """
         if (winner === "X") scoreX++;
         if (winner === "O") scoreO++;
 
-        playWinSound();
-        launchConfetti();
+        playWinSound();              // applause
+        playExtraCelebrationSound(); // sweep
+        launchConfetti();            // confetti
         speak(`Congratulations! Player ${winner} wins!`);
       }
 
@@ -609,14 +726,12 @@ TTT_HTML = """
 
       if (gameOver || board[idx] !== null) return;
 
-      /* ------------------- PLAYER MOVE ------------------- */
-
+      /* ------------------- PVP ------------------- */
       if (gameMode === "pvp") {
         board[idx] = current;
         cell.textContent = current;
         cell.classList.add(current.toLowerCase());
 
-        playClick(current);
         vibrate();
 
         const result = checkWinner();
@@ -629,14 +744,12 @@ TTT_HTML = """
       }
 
       /* ------------- PVC: HUMAN PLAYS X -------------- */
-
       if (!isHumanTurn) return;
 
       board[idx] = humanPlayer;
       cell.textContent = humanPlayer;
       cell.classList.add(humanPlayer.toLowerCase());
 
-      playClick("X");
       vibrate();
 
       let result = checkWinner();
@@ -651,68 +764,69 @@ TTT_HTML = """
     }
 
     function computerMove() {
-  if (gameOver) return;
+      if (gameOver) return;
 
-  // find smart move
-  const idx = findBestMove();
-  if (idx === null) return;
+      let moveIndex = null;
 
-  board[idx] = computerPlayer;
+      if (difficulty === "easy") {
+        moveIndex = getRandomMove();
+      } else if (difficulty === "normal") {
+        // Mix of smart + random
+        const useSmart = Math.random() < 0.55;  // 55% smart, 45% random
+        moveIndex = useSmart ? getSmartMove() : getRandomMove();
+      } else {
+        // HARD: always smart
+        moveIndex = getSmartMove();
+      }
 
-  const cell = cells[idx];
-  cell.textContent = computerPlayer;
-  cell.classList.add(computerPlayer.toLowerCase());
+      if (moveIndex === null || moveIndex === undefined) return;
 
-  playClick("O");
+      board[moveIndex] = computerPlayer;
 
-  const result = checkWinner();
-  if (result) return finishGame(result);
+      const cell = cells[moveIndex];
+      cell.textContent = computerPlayer;
+      cell.classList.add(computerPlayer.toLowerCase());
 
-  isHumanTurn = true;
-  current = humanPlayer;
-  setTurnDisplay();
-  messageText.textContent = "Your turn!";
-}
+      let result = checkWinner();
+      if (result) return finishGame(result);
 
-function findBestMove() {
-  // 1. Try to WIN
-  for (const [a, b, c] of WIN_LINES) {
-    if (board[a] === computerPlayer && board[b] === computerPlayer && board[c] === null) return c;
-    if (board[a] === computerPlayer && board[c] === computerPlayer && board[b] === null) return b;
-    if (board[b] === computerPlayer && board[c] === computerPlayer && board[a] === null) return a;
-  }
+      isHumanTurn = true;
+      current = humanPlayer;
+      setTurnDisplay();
+      messageText.textContent = "Your turn!";
+    }
 
-  // 2. BLOCK human from winning
-  for (const [a, b, c] of WIN_LINES) {
-    if (board[a] === humanPlayer && board[b] === humanPlayer && board[c] === null) return c;
-    if (board[a] === humanPlayer && board[c] === humanPlayer && board[b] === null) return b;
-    if (board[b] === humanPlayer && board[c] === humanPlayer && board[a] === null) return a;
-  }
+    /* ------------------- MODE + DIFFICULTY SWITCH ------------------- */
 
-  // 3. Take CENTER
-  if (board[4] === null) return 4;
+    function setDifficulty(level) {
+      difficulty = level;
+      diffButtons.forEach(btn => {
+        if (btn.getAttribute("data-level") === level) {
+          btn.classList.add("diff-active");
+        } else {
+          btn.classList.remove("diff-active");
+        }
+      });
+    }
 
-  // 4. Take CORNER
-  const corners = [0, 2, 6, 8];
-  for (let idx of corners) {
-    if (board[idx] === null) return idx;
-  }
-
-  // 5. Take SIDE
-  const sides = [1, 3, 5, 7];
-  for (let idx of sides) {
-    if (board[idx] === null) return idx;
-  }
-
-  return null;
-}
-
-    /* ------------------- MODE SWITCH ------------------- */
+    diffButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const level = btn.getAttribute("data-level");
+        setDifficulty(level);
+        if (gameMode === "pvc") {
+          resetBoard();
+          messageText.textContent = `Vs computer (${level} mode). You are X.`;
+        }
+      });
+    });
 
     modePvpBtn.addEventListener("click", () => {
       gameMode = "pvp";
       modePvpBtn.classList.add("mode-active");
       modePvcBtn.classList.remove("mode-active");
+
+      difficultyRow.classList.add("hidden");
+
       resetBoard();
       messageText.textContent = "Two players. Player X starts.";
     });
@@ -721,20 +835,19 @@ function findBestMove() {
       gameMode = "pvc";
       modePvcBtn.classList.add("mode-active");
       modePvpBtn.classList.remove("mode-active");
+
+      difficultyRow.classList.remove("hidden");
+      setDifficulty(difficulty || "easy");
+
       resetBoard();
       messageText.textContent = "Vs computer. You are X.";
     });
 
+    /* ------------------- BUTTONS ------------------- */
+
     cells.forEach(cell => cell.addEventListener("click", handleClick));
     resetBtn.addEventListener("click", resetBoard);
     clearScoreBtn.addEventListener("click", clearScores);
-
-    // Test button to confirm sounds
-    soundTestBtn.addEventListener("click", () => {
-      getAudioCtx();
-      playClick("X");
-      setTimeout(() => playWinSound(), 250);
-    });
 
     /* ------------------- THEME ------------------- */
 
