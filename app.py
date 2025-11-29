@@ -651,33 +651,61 @@ TTT_HTML = """
     }
 
     function computerMove() {
-      if (gameOver) return;
+  if (gameOver) return;
 
-      const empty = board
-        .map((v, i) => (v === null ? i : null))
-        .filter(i => i !== null);
+  // find smart move
+  const idx = findBestMove();
+  if (idx === null) return;
 
-      if (empty.length === 0) return;
+  board[idx] = computerPlayer;
 
-      const idx =
-        empty[Math.floor(Math.random() * empty.length)];
+  const cell = cells[idx];
+  cell.textContent = computerPlayer;
+  cell.classList.add(computerPlayer.toLowerCase());
 
-      board[idx] = computerPlayer;
+  playClick("O");
 
-      const cell = cells[idx];
-      cell.textContent = computerPlayer;
-      cell.classList.add(computerPlayer.toLowerCase());
+  const result = checkWinner();
+  if (result) return finishGame(result);
 
-      playClick("O");
+  isHumanTurn = true;
+  current = humanPlayer;
+  setTurnDisplay();
+  messageText.textContent = "Your turn!";
+}
 
-      const result = checkWinner();
-      if (result) return finishGame(result);
+function findBestMove() {
+  // 1. Try to WIN
+  for (const [a, b, c] of WIN_LINES) {
+    if (board[a] === computerPlayer && board[b] === computerPlayer && board[c] === null) return c;
+    if (board[a] === computerPlayer && board[c] === computerPlayer && board[b] === null) return b;
+    if (board[b] === computerPlayer && board[c] === computerPlayer && board[a] === null) return a;
+  }
 
-      isHumanTurn = true;
-      current = humanPlayer;
-      setTurnDisplay();
-      messageText.textContent = "Your turn!";
-    }
+  // 2. BLOCK human from winning
+  for (const [a, b, c] of WIN_LINES) {
+    if (board[a] === humanPlayer && board[b] === humanPlayer && board[c] === null) return c;
+    if (board[a] === humanPlayer && board[c] === humanPlayer && board[b] === null) return b;
+    if (board[b] === humanPlayer && board[c] === humanPlayer && board[a] === null) return a;
+  }
+
+  // 3. Take CENTER
+  if (board[4] === null) return 4;
+
+  // 4. Take CORNER
+  const corners = [0, 2, 6, 8];
+  for (let idx of corners) {
+    if (board[idx] === null) return idx;
+  }
+
+  // 5. Take SIDE
+  const sides = [1, 3, 5, 7];
+  for (let idx of sides) {
+    if (board[idx] === null) return idx;
+  }
+
+  return null;
+}
 
     /* ------------------- MODE SWITCH ------------------- */
 
