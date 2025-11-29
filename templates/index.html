@@ -5,6 +5,13 @@
   <title>Tic Tac Toe 🎲</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- PWA manifest + theme color -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#0f172a">
+
+  <!-- (optional) iOS home screen icon -->
+  <!-- <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}"> -->
+
   <!-- LOAD CSS FROM /static USING FLASK -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -18,19 +25,22 @@
       <button id="mode-pvc" class="mode-btn">Vs Computer</button>
     </div>
 
+    <!-- Top-right: Sound + Theme -->
+    <div style="text-align: right; margin-bottom: 12px;">
+      <button id="avToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem; margin-right:6px;">
+        🔊 SOUND ON
+      </button>
+      <button id="themeToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem;">
+        ☀️ Light
+      </button>
+    </div>
+
     <!-- Difficulty (only visible in Vs Computer) -->
     <div id="difficultyRow" class="difficulty-row hidden">
       <span class="difficulty-label">Difficulty:</span>
       <button class="diff-btn diff-active" data-level="easy">Easy</button>
       <button class="diff-btn" data-level="normal">Normal</button>
       <button class="diff-btn" data-level="hard">Hard</button>
-    </div>
-
-    <!-- Theme toggle -->
-    <div style="text-align: right; margin-bottom: 12px;">
-      <button id="themeToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem;">
-        ☀️ Light
-      </button>
     </div>
 
     <div class="status">
@@ -41,7 +51,6 @@
     </div>
 
     <div class="board" id="board">
-      <!-- 9 cells -->
       <div class="cell" data-idx="0"></div>
       <div class="cell" data-idx="1"></div>
       <div class="cell" data-idx="2"></div>
@@ -75,7 +84,7 @@
     </div>
   </div>
 
-  <!-- Win sound (applause) -->
+  <!-- Win sound -->
   <audio
     id="winSound"
     preload="auto"
@@ -83,10 +92,22 @@
     src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3">
   </audio>
 
-  <!-- Confetti library -->
+  <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
-  <!-- LOAD JS FROM /static USING FLASK -->
+  <!-- MAIN GAME JS -->
   <script src="{{ url_for('static', filename='script.js') }}?v=2"></script>
+
+  <!-- REGISTER SERVICE WORKER (PWA) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("/service-worker.js")
+          .catch(err => console.log("Service worker failed:", err));
+      });
+    }
+  </script>
+
 </body>
 </html>

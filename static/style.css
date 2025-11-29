@@ -223,6 +223,21 @@ body.light-mode .cell.winning {
   flex-wrap: wrap;
 }
 
+/* settings row (sound on/off/vibrate button) */
+.settings-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.settings-btn {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+}
+
 .btn {
   border-radius: 999px;
   padding: 8px 16px;
@@ -323,7 +338,8 @@ body.light-mode .cell:hover {
   border-color: #cbd5f5;
 }
 
-body.light-mode .btn-ghost {
+body.light-mode .btn-ghost,
+body.light-mode .settings-btn {
   color: #4b5563;
   border-color: rgba(148,163,184,0.9);
 }
