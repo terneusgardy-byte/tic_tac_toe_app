@@ -61,7 +61,37 @@ TTT_HTML = """
       text-align: center;
       font-size: 0.9rem;
       color: var(--text-sub);
-      margin-bottom: 20px;
+      margin-bottom: 12px;
+    }
+
+    /* mode buttons */
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .mode-btn {
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text-sub);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .mode-btn:hover {
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.8);
+    }
+
+    .mode-active {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 8px 20px rgba(34, 197, 94, 0.55);
     }
 
     .status {
@@ -278,6 +308,18 @@ TTT_HTML = """
       color: #374151;
     }
 
+    body.light-mode .mode-btn {
+      background: #f9fafb;
+      color: #4b5563;
+      border-color: rgba(148, 163, 184, 0.8);
+    }
+
+    body.light-mode .mode-active {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      box-shadow: 0 8px 18px rgba(34, 197, 94, 0.5);
+    }
+
     @media (max-width: 480px) {
       .wrap {
         border-radius: 18px;
@@ -297,6 +339,11 @@ TTT_HTML = """
   <div class="wrap">
     <div class="title">Tic Tac Toe 🎮</div>
     <div class="subtitle">Two players · Local game · First to 3 wins? ⭐</div>
+
+    <div class="mode-toggle">
+      <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
+      <button id="mode-pvc" class="mode-btn">Vs Computer</button>
+    </div>
 
     <!-- Theme toggle -->
     <div style="text-align: right; margin-bottom: 12px;">
@@ -341,7 +388,19 @@ TTT_HTML = """
       <div class="score-o" id="scoreO">O wins: 0</div>
       <div class="score-draw" id="scoreDraw">Draws: 0</div>
     </div>
+
+    <div style="margin-top:16px; text-align:center;">
+      <button id="soundTestBtn" class="btn btn-ghost">
+        🔊 Test Game Sound
+      </button>
+    </div>
   </div>
+
+  <!-- Win sound: crowd applause -->
+  <audio id="winSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3"></audio>
+
+  <!-- Confetti library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <script>
     const boardEl = document.getElementById("board");
@@ -351,11 +410,15 @@ TTT_HTML = """
     const messageText = document.getElementById("messageText");
     const resetBtn = document.getElementById("resetBtn");
     const clearScoreBtn = document.getElementById("clearScoreBtn");
+    const soundTestBtn = document.getElementById("soundTestBtn");
 
     const scoreXEl = document.getElementById("scoreX");
     const scoreOEl = document.getElementById("scoreO");
     const scoreDrawEl = document.getElementById("scoreDraw");
     const themeToggleBtn = document.getElementById("themeToggle");
+
+    const modePvpBtn = document.getElementById("mode-pvp");
+    const modePvcBtn = document.getElementById("mode-pvc");
 
     let board = Array(9).fill(null);
     let current = "X";
@@ -364,6 +427,12 @@ TTT_HTML = """
     let scoreX = 0;
     let scoreO = 0;
     let scoreDraw = 0;
+
+    // game mode: "pvp" = 2 players, "pvc" = vs computer
+    let gameMode = "pvp";
+    let humanPlayer = "X";
+    let computerPlayer = "O";
+    let isHumanTurn = true;
 
     const WIN_LINES = [
       [0, 1, 2],
@@ -376,6 +445,85 @@ TTT_HTML = """
       [2, 4, 6],
     ];
 
+    /* ------------------- AUDIO + VIBRATION ------------------- */
+
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        audioCtx = new Ctx();
+      }
+      return audioCtx;
+    }
+
+    function playClick(player) {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.value = player === "X" ? 520 : 420;
+      gain.gain.value = 0.08;
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+      osc.start(now);
+      osc.stop(now + 0.06);
+    }
+
+    function vibrate() {
+      if (navigator.vibrate) {
+        navigator.vibrate([30]);
+      }
+    }
+
+    // Speech helper
+    function speak(text) {
+      try {
+        if (!("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1;
+        utter.pitch = 1.05;
+        utter.volume = 1;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {}
+    }
+
+    // Win sound (applause from <audio>)
+    function playWinSound() {
+      const snd = document.getElementById("winSound");
+      if (!snd) return;
+      snd.currentTime = 0;
+      snd.play().catch(() => {});
+    }
+
+    // Confetti
+    function launchConfetti() {
+      if (typeof confetti !== "function") return;
+
+      const duration = 1200;
+      const end = Date.now() + duration;
+
+      (function frame() {
+        confetti({
+          particleCount: 10,
+          startVelocity: 25,
+          spread: 70,
+          origin: { x: Math.random(), y: Math.random() - 0.2 }
+        });
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      })();
+    }
+
+    /* ---------------------------------------------------------- */
+
     function setTurnDisplay() {
       turnBadge.textContent = current;
       turnText.classList.toggle("turn-x", current === "X");
@@ -383,7 +531,7 @@ TTT_HTML = """
     }
 
     function clearWinningStyles() {
-      cells.forEach(c => c.classList.remove("winning"));
+      cells.forEach(c => c.classList.remove("winning", "x", "o"));
     }
 
     function updateScoresDisplay() {
@@ -392,64 +540,58 @@ TTT_HTML = """
       scoreDrawEl.textContent = "Draws: " + scoreDraw;
     }
 
-    function handleClick(e) {
-      const cell = e.target;
-      const idx = Number(cell.getAttribute("data-idx"));
-
-      if (gameOver || board[idx] !== null) {
-        return;
-      }
-
-      board[idx] = current;
-      cell.textContent = current;
-      cell.classList.add(current.toLowerCase());
-
-      const result = checkWinner();
-      if (result) {
-        gameOver = true;
-        const { winner, line } = result;
-
-        if (winner === "draw") {
-          messageText.textContent = "It's a draw. Nobody wins.";
-          scoreDraw++;
-        } else {
-          messageText.textContent = "Player " + winner + " wins! 🎉";
-          line.forEach(i => cells[i].classList.add("winning"));
-          if (winner === "X") scoreX++;
-          if (winner === "O") scoreO++;
-        }
-        updateScoresDisplay();
-        return;
-      }
-
-      current = current === "X" ? "O" : "X";
-      setTurnDisplay();
-      messageText.textContent = "Player " + current + ", your move.";
-    }
-
     function checkWinner() {
       for (const [a, b, c] of WIN_LINES) {
         if (board[a] && board[a] === board[b] && board[a] === board[c]) {
           return { winner: board[a], line: [a, b, c] };
         }
       }
-
       if (board.every(v => v !== null)) {
         return { winner: "draw", line: [] };
       }
       return null;
     }
 
+    function finishGame(result) {
+      if (!result) return;
+      gameOver = true;
+
+      const { winner, line } = result;
+
+      if (winner === "draw") {
+        messageText.textContent = "It's a draw. Nobody wins.";
+        scoreDraw++;
+        speak("It's a draw. Nobody wins.");
+      } else {
+        messageText.textContent = `Player ${winner} wins! 🎉`;
+        line.forEach(i => cells[i].classList.add("winning"));
+        if (winner === "X") scoreX++;
+        if (winner === "O") scoreO++;
+
+        playWinSound();
+        launchConfetti();
+        speak(`Congratulations! Player ${winner} wins!`);
+      }
+
+      updateScoresDisplay();
+    }
+
     function resetBoard() {
       board = Array(9).fill(null);
       gameOver = false;
       current = "X";
+      isHumanTurn = true;
+
+      clearWinningStyles();
+      cells.forEach(c => (c.textContent = ""));
+
       setTurnDisplay();
-      messageText.textContent = "New round! Player X starts.";
-      cells.forEach(c => {
-        c.textContent = "";
-        c.classList.remove("x", "o", "winning");
-      });
+
+      if (gameMode === "pvp") {
+        messageText.textContent = "New round! Player X starts.";
+      } else {
+        messageText.textContent = "Vs computer. You are X, tap a square.";
+      }
     }
 
     function clearScores() {
@@ -461,13 +603,113 @@ TTT_HTML = """
       messageText.textContent = "Scores cleared. Player X starts.";
     }
 
-    cells.forEach(cell =>
-      cell.addEventListener("click", handleClick)
-    );
+    function handleClick(e) {
+      const cell = e.target;
+      const idx = Number(cell.getAttribute("data-idx"));
+
+      if (gameOver || board[idx] !== null) return;
+
+      /* ------------------- PLAYER MOVE ------------------- */
+
+      if (gameMode === "pvp") {
+        board[idx] = current;
+        cell.textContent = current;
+        cell.classList.add(current.toLowerCase());
+
+        playClick(current);
+        vibrate();
+
+        const result = checkWinner();
+        if (result) return finishGame(result);
+
+        current = current === "X" ? "O" : "X";
+        setTurnDisplay();
+        messageText.textContent = `Player ${current}, your move.`;
+        return;
+      }
+
+      /* ------------- PVC: HUMAN PLAYS X -------------- */
+
+      if (!isHumanTurn) return;
+
+      board[idx] = humanPlayer;
+      cell.textContent = humanPlayer;
+      cell.classList.add(humanPlayer.toLowerCase());
+
+      playClick("X");
+      vibrate();
+
+      let result = checkWinner();
+      if (result) return finishGame(result);
+
+      isHumanTurn = false;
+      messageText.textContent = "Computer is thinking...";
+
+      setTimeout(() => {
+        computerMove();
+      }, 350);
+    }
+
+    function computerMove() {
+      if (gameOver) return;
+
+      const empty = board
+        .map((v, i) => (v === null ? i : null))
+        .filter(i => i !== null);
+
+      if (empty.length === 0) return;
+
+      const idx =
+        empty[Math.floor(Math.random() * empty.length)];
+
+      board[idx] = computerPlayer;
+
+      const cell = cells[idx];
+      cell.textContent = computerPlayer;
+      cell.classList.add(computerPlayer.toLowerCase());
+
+      playClick("O");
+
+      const result = checkWinner();
+      if (result) return finishGame(result);
+
+      isHumanTurn = true;
+      current = humanPlayer;
+      setTurnDisplay();
+      messageText.textContent = "Your turn!";
+    }
+
+    /* ------------------- MODE SWITCH ------------------- */
+
+    modePvpBtn.addEventListener("click", () => {
+      gameMode = "pvp";
+      modePvpBtn.classList.add("mode-active");
+      modePvcBtn.classList.remove("mode-active");
+      resetBoard();
+      messageText.textContent = "Two players. Player X starts.";
+    });
+
+    modePvcBtn.addEventListener("click", () => {
+      gameMode = "pvc";
+      modePvcBtn.classList.add("mode-active");
+      modePvpBtn.classList.remove("mode-active");
+      resetBoard();
+      messageText.textContent = "Vs computer. You are X.";
+    });
+
+    cells.forEach(cell => cell.addEventListener("click", handleClick));
     resetBtn.addEventListener("click", resetBoard);
     clearScoreBtn.addEventListener("click", clearScores);
 
-    // Theme toggle (dark / light) with localStorage
+    // Test button to confirm sounds
+    soundTestBtn.addEventListener("click", () => {
+      getAudioCtx();
+      playClick("X");
+      setTimeout(() => playWinSound(), 250);
+    });
+
+    /* ------------------- THEME ------------------- */
+
     function applyTheme(mode) {
       const body = document.body;
       if (mode === "light") {
@@ -488,10 +730,11 @@ TTT_HTML = """
       applyTheme(isLight ? "dark" : "light");
     });
 
-    // initial UI state
+    /* ------------------- INIT ------------------- */
     setTurnDisplay();
     updateScoresDisplay();
   </script>
+
 </body>
 </html>
 """
