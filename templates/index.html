@@ -5,14 +5,8 @@
   <title>Tic Tac Toe 🎲</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-
-  <!-- Confetti library -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-
-  <!-- Game logic -->
-  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+  <!-- LOAD CSS FROM /static USING FLASK -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="wrap">
@@ -79,5 +73,11 @@
 
   <!-- Win sound (applause) -->
   <audio id="winSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3"></audio>
+
+  <!-- Confetti library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <!-- LOAD JS FROM /static USING FLASK -->
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

@@ -45,7 +45,7 @@ const WIN_LINES = [
   [2, 4, 6],
 ];
 
-/* ------------------- AUDIO + VIBRATION ------------------- */
+/* ---------- AUDIO + VIBRATION ---------- */
 
 function vibrate() {
   if (navigator.vibrate) {
@@ -109,7 +109,7 @@ function launchConfetti() {
       particleCount: 10,
       startVelocity: 25,
       spread: 70,
-      origin: { x: Math.random(), y: Math.random() - 0.2 }
+      origin: { x: Math.random(), y: Math.random() - 0.2 },
     });
     if (Date.now() < end) {
       requestAnimationFrame(frame);
@@ -117,7 +117,7 @@ function launchConfetti() {
   })();
 }
 
-/* ------------------- CORE HELPERS ------------------- */
+/* ---------- CORE HELPERS ---------- */
 
 function setTurnDisplay() {
   turnBadge.textContent = current;
@@ -126,7 +126,7 @@ function setTurnDisplay() {
 }
 
 function clearWinningStyles() {
-  cells.forEach(c => c.classList.remove("winning", "x", "o"));
+  cells.forEach((c) => c.classList.remove("winning", "x", "o"));
 }
 
 function updateScoresDisplay() {
@@ -141,7 +141,7 @@ function checkWinner() {
       return { winner: board[a], line: [a, b, c] };
     }
   }
-  if (board.every(v => v !== null)) {
+  if (board.every((v) => v !== null)) {
     return { winner: "draw", line: [] };
   }
   return null;
@@ -154,7 +154,7 @@ function evaluateBoard(state) {
       return state[a]; // 'X' or 'O'
     }
   }
-  if (state.every(v => v !== null)) return "draw";
+  if (state.every((v) => v !== null)) return "draw";
   return null;
 }
 
@@ -168,14 +168,14 @@ function getRandomMove() {
   return empty[idx];
 }
 
-// Minimax for smart AI
+// Minimax for HARD / smart move
 function minimax(state, player) {
   const winner = evaluateBoard(state);
   if (winner === computerPlayer) return { score: 10 };
   if (winner === humanPlayer) return { score: -10 };
   if (winner === "draw") return { score: 0 };
 
-  const isMaximizing = (player === computerPlayer);
+  const isMaximizing = player === computerPlayer;
   let best = { score: isMaximizing ? -Infinity : Infinity, index: null };
 
   for (let i = 0; i < 9; i++) {
@@ -207,12 +207,7 @@ function getSmartMove() {
   return getRandomMove();
 }
 
-function chooseMixedMove(smartProbability) {
-  const useSmart = Math.random() < smartProbability;
-  return useSmart ? getSmartMove() : getRandomMove();
-}
-
-/* ------------------- GAME FLOW ------------------- */
+/* ---------- GAME FLOW ---------- */
 
 function finishGame(result) {
   if (!result) return;
@@ -226,13 +221,13 @@ function finishGame(result) {
     speak("It's a draw. Nobody wins.");
   } else {
     messageText.textContent = `Player ${winner} wins! 🎉`;
-    line.forEach(i => cells[i].classList.add("winning"));
+    line.forEach((i) => cells[i].classList.add("winning"));
     if (winner === "X") scoreX++;
     if (winner === "O") scoreO++;
 
-    playWinSound();              // applause
-    playExtraCelebrationSound(); // sweep
-    launchConfetti();            // confetti
+    playWinSound();
+    playExtraCelebrationSound();
+    launchConfetti();
     speak(`Congratulations! Player ${winner} wins!`);
   }
 
@@ -246,7 +241,7 @@ function resetBoard() {
   isHumanTurn = true;
 
   clearWinningStyles();
-  cells.forEach(c => (c.textContent = ""));
+  cells.forEach((c) => (c.textContent = ""));
 
   setTurnDisplay();
 
@@ -272,7 +267,7 @@ function handleClick(e) {
 
   if (gameOver || board[idx] !== null) return;
 
-  /* ------------------- PVP ------------------- */
+  /* ---------- PVP ---------- */
   if (gameMode === "pvp") {
     board[idx] = current;
     cell.textContent = current;
@@ -289,7 +284,7 @@ function handleClick(e) {
     return;
   }
 
-  /* ------------- PVC: HUMAN PLAYS X -------------- */
+  /* ---------- PVC: HUMAN PLAYS X ---------- */
   if (!isHumanTurn) return;
 
   board[idx] = humanPlayer;
@@ -315,14 +310,17 @@ function computerMove() {
   let moveIndex = null;
 
   if (difficulty === "easy") {
-    // 60% smart, 40% random
-    moveIndex = chooseMixedMove(0.60);
+    // 40% smart, 60% random
+    const useSmart = Math.random() < 0.4;
+    moveIndex = useSmart ? getSmartMove() : getRandomMove();
   } else if (difficulty === "normal") {
     // 80% smart, 20% random
-    moveIndex = chooseMixedMove(0.80);
+    const useSmart = Math.random() < 0.8;
+    moveIndex = useSmart ? getSmartMove() : getRandomMove();
   } else {
     // HARD: 90% smart, 10% random
-    moveIndex = chooseMixedMove(0.90);
+    const useSmart = Math.random() < 0.9;
+    moveIndex = useSmart ? getSmartMove() : getRandomMove();
   }
 
   if (moveIndex === null || moveIndex === undefined) return;
@@ -342,11 +340,11 @@ function computerMove() {
   messageText.textContent = "Your turn!";
 }
 
-/* ------------------- MODE + DIFFICULTY SWITCH ------------------- */
+/* ---------- MODE + DIFFICULTY SWITCH ---------- */
 
 function setDifficulty(level) {
   difficulty = level;
-  diffButtons.forEach(btn => {
+  diffButtons.forEach((btn) => {
     if (btn.getAttribute("data-level") === level) {
       btn.classList.add("diff-active");
     } else {
@@ -355,7 +353,7 @@ function setDifficulty(level) {
   });
 }
 
-diffButtons.forEach(btn => {
+diffButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const level = btn.getAttribute("data-level");
     setDifficulty(level);
@@ -389,13 +387,13 @@ modePvcBtn.addEventListener("click", () => {
   messageText.textContent = "Vs computer. You are X.";
 });
 
-/* ------------------- BUTTONS ------------------- */
+/* ---------- BUTTONS ---------- */
 
-cells.forEach(cell => cell.addEventListener("click", handleClick));
+cells.forEach((cell) => cell.addEventListener("click", handleClick));
 resetBtn.addEventListener("click", resetBoard);
 clearScoreBtn.addEventListener("click", clearScores);
 
-/* ------------------- THEME ------------------- */
+/* ---------- THEME ---------- */
 
 function applyTheme(mode) {
   const body = document.body;
@@ -417,6 +415,6 @@ themeToggleBtn.addEventListener("click", () => {
   applyTheme(isLight ? "dark" : "light");
 });
 
-/* ------------------- INIT ------------------- */
+/* ---------- INIT ---------- */
 setTurnDisplay();
 updateScoresDisplay();
