@@ -55,8 +55,6 @@ function vibrate() {
 
 // Shared AudioContext for all custom sounds
 let audioCtx = null;
-let audioPrimed = false;
-
 function getAudioCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
@@ -69,25 +67,6 @@ function getAudioCtx() {
     audioCtx.resume();
   }
   return audioCtx;
-}
-
-// One-time tiny silent sound to "unlock" audio on stricter browsers (Render)
-function primeAudio() {
-  if (audioPrimed) return;
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-
-  audioPrimed = true;
-
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime); // effectively silent
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.02);
 }
 
 // Speech helper
@@ -410,10 +389,10 @@ function handleClick(e) {
   const cell = e.target;
   const idx = Number(cell.getAttribute("data-idx"));
 
-  if (gameOver || board[idx] !== null) return;
+  // 🔑 Unlock / resume AudioContext on a REAL user tap
+  getAudioCtx();
 
-  // First real tap unlocks audio for Render / strict browsers
-  primeAudio();
+  if (gameOver || board[idx] !== null) return;
 
   /* ---------- PVP ---------- */
   if (gameMode === "pvp") {
