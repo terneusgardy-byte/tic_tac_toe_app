@@ -18,10 +18,20 @@ const themeToggleBtn = document.getElementById("themeToggle");
 const modePvpBtn = document.getElementById("mode-pvp");
 const modePvcBtn = document.getElementById("mode-pvc");
 
-const difficultyRow = document.getElementById("difficultyRow");
+const levelRow = document.getElementById("difficultyRow");
 const diffButtons = Array.from(document.querySelectorAll(".diff-btn"));
 
 const avToggleBtn = document.getElementById("avToggle");
+
+/* Helpers to show/hide the Level row only when we want */
+function showLevelRow() {
+  if (!levelRow) return;
+  levelRow.style.display = "flex";
+}
+function hideLevelRow() {
+  if (!levelRow) return;
+  levelRow.style.display = "none";
+}
 
 /* ----------------------------------------------------------
    GAME STATE
@@ -35,12 +45,12 @@ let scoreX = 0;
 let scoreO = 0;
 let scoreDraw = 0;
 
-let gameMode = "pvp";         // pvp or pvc
+let gameMode = "pvp";         // "pvp" or "pvc"
 let humanPlayer = "X";
 let computerPlayer = "O";
 let isHumanTurn = true;
 
-let difficulty = "easy";      // easy | normal | hard
+let difficulty = "easy";      // "easy" | "normal" | "hard"
 
 const WIN_LINES = [
   [0, 1, 2],
@@ -353,9 +363,9 @@ function resetBoard() {
   setTurnDisplay();
 
   if (gameMode === "pvp") {
-    messageText.textContent = "New round! Player X starts.";
+    messageText.textContent = "Two players. Player X starts.";
   } else {
-    messageText.textContent = "Vs computer. You are X.";
+    messageText.textContent = `Vs computer (${difficulty}). You are X.`;
   }
 }
 
@@ -417,7 +427,7 @@ function computerMove() {
   if (gameOver) return;
 
   let move =
-    difficulty === "easy"   ? (Math.random() < 0.4 ? getSmartMove() : getRandomMove()) :
+    difficulty === "easy"   ? (Math.random() < 0.6 ? getSmartMove() : getRandomMove()) :
     difficulty === "normal" ? (Math.random() < 0.8 ? getSmartMove() : getRandomMove()) :
                               (Math.random() < 0.9 ? getSmartMove() : getRandomMove());
 
@@ -465,7 +475,9 @@ modePvpBtn.addEventListener("click", () => {
   gameMode = "pvp";
   modePvpBtn.classList.add("mode-active");
   modePvcBtn.classList.remove("mode-active");
-  difficultyRow.classList.add("hidden");
+
+  hideLevelRow();   // 🔒 NEVER show Level row in 2 Players
+
   resetBoard();
   messageText.textContent = "Two players. Player X starts.";
 });
@@ -474,10 +486,12 @@ modePvcBtn.addEventListener("click", () => {
   gameMode = "pvc";
   modePvcBtn.classList.add("mode-active");
   modePvpBtn.classList.remove("mode-active");
-  difficultyRow.classList.remove("hidden");
+
+  showLevelRow();   // 👀 ONLY show Level row in Vs Computer
   setDifficulty(difficulty);
+
   resetBoard();
-  messageText.textContent = "Vs computer. You are X.";
+  messageText.textContent = `Vs computer (${difficulty}). You are X.`;
 });
 
 /* ----------------------------------------------------------
@@ -525,3 +539,4 @@ themeToggleBtn.addEventListener("click", () => {
 setTurnDisplay();
 updateScoresDisplay();
 updateAvUI();
+hideLevelRow();   // 🚫 Start with Level hidden (2 Players mode)
