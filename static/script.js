@@ -427,7 +427,7 @@ function computerMove() {
   if (gameOver) return;
 
   let move =
-    difficulty === "easy"   ? (Math.random() < 0.6 ? getSmartMove() : getRandomMove()) :
+    difficulty === "easy"   ? (Math.random() < 0.5 ? getSmartMove() : getRandomMove()) :
     difficulty === "normal" ? (Math.random() < 0.8 ? getSmartMove() : getRandomMove()) :
                               (Math.random() < 0.9 ? getSmartMove() : getRandomMove());
 
