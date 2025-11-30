@@ -2,17 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Tic Tac Toe 🎲</title>
+  <title>Tic Tac Toe 🎮</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- PWA manifest + theme color -->
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#0f172a">
 
-  <!-- (optional) iOS home screen icon -->
-  <!-- <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}"> -->
-
-  <!-- LOAD CSS FROM /static USING FLASK -->
+  <!-- Main CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -20,29 +17,66 @@
     <div class="title">Tic Tac Toe 🎮</div>
     <div class="subtitle">Two players · Local game · First to 3 wins? ⭐</div>
 
-    <div class="mode-toggle">
-      <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
-      <button id="mode-pvc" class="mode-btn">Vs Computer</button>
+    <!-- TOP BAR: modes left, sound/light right -->
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        margin-bottom:4px;
+      "
+    >
+      <!-- LEFT COLUMN: Game modes + Level row -->
+      <div style="display:flex; flex-direction:column;">
+
+        <!-- Game modes -->
+        <div class="mode-toggle" style="display:flex; gap:6px; margin-bottom:4px;">
+          <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
+          <button id="mode-pvc" class="mode-btn">Vs Computer</button>
+        </div>
+
+        <!-- LEVEL (aligned directly under 2 Players) -->
+        <div
+          id="difficultyRow"
+          class="difficulty-row hidden"
+          style="
+            margin-top:-2px;
+            margin-bottom:10px;
+            font-size:0.85rem;
+            display:flex;
+            align-items:center;
+            gap:6px;
+          "
+        >
+          <span class="difficulty-label" style="margin-right:6px;">Level:</span>
+
+          <button class="diff-btn diff-active" data-level="easy">Easy</button>
+          <button class="diff-btn" data-level="normal">Normal</button>
+          <button class="diff-btn" data-level="hard">Hard</button>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Sound + Theme -->
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button
+          id="avToggle"
+          class="btn btn-ghost"
+          style="padding:6px 12px; font-size:0.8rem;"
+        >
+          🔊 SOUND ON
+        </button>
+        <button
+          id="themeToggle"
+          class="btn btn-ghost"
+          style="padding:6px 12px; font-size:0.8rem;"
+        >
+          ☀️ Light
+        </button>
+      </div>
     </div>
 
-    <!-- Top-right: Sound + Theme -->
-    <div style="text-align: right; margin-bottom: 12px;">
-      <button id="avToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem; margin-right:6px;">
-        🔊 SOUND ON
-      </button>
-      <button id="themeToggle" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem;">
-        ☀️ Light
-      </button>
-    </div>
-
-    <!-- Difficulty (only visible in Vs Computer) -->
-    <div id="difficultyRow" class="difficulty-row hidden">
-      <span class="difficulty-label">Difficulty:</span>
-      <button class="diff-btn diff-active" data-level="easy">Easy</button>
-      <button class="diff-btn" data-level="normal">Normal</button>
-      <button class="diff-btn" data-level="hard">Hard</button>
-    </div>
-
+    <!-- STATUS BAR -->
     <div class="status">
       <div class="turn" id="turnText">
         Turn: <span id="turnBadge">X</span>
@@ -50,6 +84,7 @@
       <div class="message" id="messageText">Player X starts. Tap a square.</div>
     </div>
 
+    <!-- BOARD -->
     <div class="board" id="board">
       <div class="cell" data-idx="0"></div>
       <div class="cell" data-idx="1"></div>
@@ -62,6 +97,7 @@
       <div class="cell" data-idx="8"></div>
     </div>
 
+    <!-- CONTROLS -->
     <div class="controls">
       <button class="btn btn-primary" id="resetBtn">
         <span class="icon">🔁</span>
@@ -77,6 +113,7 @@
     <div id="winCrown" class="crown hidden">👑</div>
     <div id="clapBurst" class="clap-container hidden"></div>
 
+    <!-- SCOREBOARD -->
     <div class="scoreboard">
       <div class="score-x" id="scoreX">X wins: 0</div>
       <div class="score-o" id="scoreO">O wins: 0</div>
@@ -84,7 +121,7 @@
     </div>
   </div>
 
-  <!-- Win sound -->
+  <!-- Win sound (applause) -->
   <audio
     id="winSound"
     preload="auto"
@@ -95,10 +132,10 @@
   <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
-  <!-- MAIN GAME JS -->
+  <!-- Main JS -->
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 
-  <!-- REGISTER SERVICE WORKER (PWA) -->
+  <!-- Service worker -->
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
@@ -108,6 +145,5 @@
       });
     }
   </script>
-
 </body>
 </html>
