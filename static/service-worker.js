@@ -1,21 +1,27 @@
 // ---------------------------------------------------
-// Tic Tac Toe — Progressive Web App Service Worker
+// Tic Tac Toe — PWA Service Worker (cache-first)
 // ---------------------------------------------------
 
-const CACHE_NAME = "ttt-cache-v1";
+const CACHE_NAME = "ttt-cache-v2";  // bump version to force fresh cache
 
 const ASSETS = [
-  "/", 
+  "/",
   "/static/style.css",
   "/static/script.js",
-  "/static/manifest.json"
-  // Do NOT cache the service-worker itself
+  "/static/manifest.json",
+  "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
 ];
 
 // INSTALL — cache core assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(ASSETS))
+      .catch((err) => {
+        console.error("SW install cache error:", err);
+      })
   );
   self.skipWaiting();
 });
@@ -34,13 +40,22 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// FETCH — network first, fallback to cache
+// FETCH — cache-first, with special handling for navigation
 self.addEventListener("fetch", (event) => {
+  const req = event.request;
+
+  // When opening the app (navigation) — serve cached "/" if offline
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).catch(() => caches.match("/"))
+    );
+    return;
+  }
+
+  // For everything else (CSS, JS, icons): cache-first, ignore query strings
   event.respondWith(
-    fetch(event.request)
-      .then((networkRes) => {
-        return networkRes;
-      })
-      .catch(() => caches.match(event.request))
+    caches
+      .match(req, { ignoreSearch: true })
+      .then((cached) => cached || fetch(req))
   );
 });
