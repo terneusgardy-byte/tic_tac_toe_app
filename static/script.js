@@ -1,3 +1,7 @@
+/* ----------------------------------------------------------
+   ELEMENTS
+----------------------------------------------------------- */
+
 const boardEl = document.getElementById("board");
 const cells = Array.from(document.querySelectorAll(".cell"));
 const turnText = document.getElementById("turnText");
@@ -19,6 +23,10 @@ const diffButtons = Array.from(document.querySelectorAll(".diff-btn"));
 
 const avToggleBtn = document.getElementById("avToggle");
 
+/* ----------------------------------------------------------
+   GAME STATE
+----------------------------------------------------------- */
+
 let board = Array(9).fill(null);
 let current = "X";
 let gameOver = false;
@@ -27,14 +35,12 @@ let scoreX = 0;
 let scoreO = 0;
 let scoreDraw = 0;
 
-// game mode: "pvp" = 2 players, "pvc" = vs computer
-let gameMode = "pvp";
+let gameMode = "pvp";         // pvp or pvc
 let humanPlayer = "X";
 let computerPlayer = "O";
 let isHumanTurn = true;
 
-// difficulty: "easy" | "normal" | "hard"
-let difficulty = "easy";
+let difficulty = "easy";      // easy | normal | hard
 
 const WIN_LINES = [
   [0, 1, 2],
@@ -47,63 +53,70 @@ const WIN_LINES = [
   [2, 4, 6],
 ];
 
-/* ---------- SOUND / VIBRATE MODE (single button) ---------- */
-// Modes:
-// "sound_on"  -> sound + voice + vibrate
-// "sound_off" -> no sound, no voice, no vibrate
-// "vibrate"   -> no sound/voice, vibrate only
+/* ----------------------------------------------------------
+   AUDIO + VIBRATION + MODES
+----------------------------------------------------------- */
+
 const AV_MODES = ["sound_on", "sound_off", "vibrate"];
 let avMode = localStorage.getItem("ttt_av_mode") || "sound_on";
 
 function isSoundEnabled() {
   return avMode === "sound_on";
 }
-
 function isVibrateEnabled() {
   return avMode === "sound_on" || avMode === "vibrate";
 }
-
 function saveAvMode() {
   localStorage.setItem("ttt_av_mode", avMode);
 }
-
 function updateAvUI() {
   if (!avToggleBtn) return;
-  if (avMode === "sound_on") {
-    avToggleBtn.textContent = "🔊 SOUND ON";
-  } else if (avMode === "sound_off") {
-    avToggleBtn.textContent = "🔕 SOUND OFF";
-  } else {
-    avToggleBtn.textContent = "📳 VIBRATE";
-  }
+  if (avMode === "sound_on") avToggleBtn.textContent = "🔊 SOUND ON";
+  else if (avMode === "sound_off") avToggleBtn.textContent = "🔕 SOUND OFF";
+  else avToggleBtn.textContent = "📳 VIBRATE";
 }
 
-/* ---------- AUDIO + VIBRATION ---------- */
+/* VIBRATION --------------------------------------------- */
 
 function vibrate() {
   if (!isVibrateEnabled()) return;
-  if (navigator.vibrate) {
-    navigator.vibrate([25]);
-  }
+  if (!navigator.vibrate) return; // iPhone Safari → silently ignore
+  navigator.vibrate(25);
 }
 
-// Shared AudioContext for all custom sounds
+/* AUDIO ENGINE (tap beep + win sound) --------------------- */
+
 let audioCtx = null;
 function getAudioCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
-
-  if (!audioCtx) {
-    audioCtx = new AC();
-  }
-
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 
-// Speech helper
+function playTapBeep() {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "square";
+  osc.frequency.setValueAtTime(600, now);
+
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.1);
+}
+
 function speak(text) {
   try {
     if (!isSoundEnabled()) return;
@@ -117,12 +130,6 @@ function speak(text) {
   } catch (e) {}
 }
 
-/**
- * Stadium crowd mix:
- * - Wide "roar" noise with light echo
- * - Random clap bursts on top
- * - Around 2s total
- */
 function playWinSound() {
   if (!isSoundEnabled()) return;
 
@@ -131,112 +138,102 @@ function playWinSound() {
 
   const now = ctx.currentTime;
 
-  // Master gain to control global volume + fade out
-  const masterGain = ctx.createGain();
-  masterGain.gain.setValueAtTime(0.95, now);
-  masterGain.gain.linearRampToValueAtTime(0.0001, now + 2.1);
-  masterGain.connect(ctx.destination);
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.9, now);
+  master.gain.linearRampToValueAtTime(0.0001, now + 2.1);
+  master.connect(ctx.destination);
 
-  /* --- 1) CROWD ROAR (background) --- */
-  const roarDuration = 2.0;
-  const roarBufferSize = Math.floor(ctx.sampleRate * roarDuration);
-  const roarBuffer = ctx.createBuffer(1, roarBufferSize, ctx.sampleRate);
-  const roarData = roarBuffer.getChannelData(0);
+  const roarBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const data = roarBuf.getChannelData(0);
 
-  for (let i = 0; i < roarBufferSize; i++) {
-    // Smoothish noise for "roar"
-    roarData[i] = (Math.random() * 2 - 1) * 0.5;
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * 0.5;
   }
 
-  const roarSource = ctx.createBufferSource();
-  roarSource.buffer = roarBuffer;
+  const roar = ctx.createBufferSource();
+  roar.buffer = roarBuf;
 
-  const roarFilter = ctx.createBiquadFilter();
-  roarFilter.type = "bandpass";
-  roarFilter.frequency.value = 700; // mid crowd band
-  roarFilter.Q.value = 0.9;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 700;
 
-  const roarGain = ctx.createGain();
-  roarGain.gain.setValueAtTime(0.8, now);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.8, now);
 
-  // Simple echo / reverb with feedback
+  roar.connect(filter);
+  filter.connect(g);
+  g.connect(master);
+
   const delay = ctx.createDelay();
-  delay.delayTime.value = 0.09; // 90 ms "stadium slap"
+  delay.delayTime.value = 0.09;
 
-  const feedback = ctx.createGain();
-  feedback.gain.value = 0.35; // how strong the echo bounces
+  const fb = ctx.createGain();
+  fb.gain.value = 0.35;
 
-  roarSource.connect(roarFilter);
-  roarFilter.connect(roarGain);
+  g.connect(delay);
+  delay.connect(fb);
+  fb.connect(delay);
+  delay.connect(master);
 
-  // Dry
-  roarGain.connect(masterGain);
-  // Wet (echo)
-  roarGain.connect(delay);
-  delay.connect(feedback);
-  feedback.connect(delay);
-  delay.connect(masterGain);
-
-  roarSource.start(now);
-  roarSource.stop(now + roarDuration);
-
-  /* --- 2) CLAP BURSTS (foreground pops) --- */
-  const hits = 14;
-  for (let i = 0; i < hits; i++) {
-    const t = now + 0.2 + Math.random() * 1.0; // spread over ~1.2s
-
-    const clapDuration = 0.2;
-    const clapBufferSize = Math.floor(ctx.sampleRate * clapDuration);
-    const clapBuffer = ctx.createBuffer(1, clapBufferSize, ctx.sampleRate);
-    const clapData = clapBuffer.getChannelData(0);
-
-    for (let j = 0; j < clapBufferSize; j++) {
-      // Sharper noise for clap transient
-      clapData[j] = (Math.random() * 2 - 1);
-    }
-
-    const clapSource = ctx.createBufferSource();
-    clapSource.buffer = clapBuffer;
-
-    const clapFilter = ctx.createBiquadFilter();
-    clapFilter.type = "bandpass";
-    clapFilter.frequency.value = 1500 + Math.random() * 1000; // bright
-    clapFilter.Q.value = 2.0;
-
-    const clapGain = ctx.createGain();
-    clapGain.gain.setValueAtTime(0.7, t);
-    clapGain.gain.exponentialRampToValueAtTime(0.001, t + clapDuration);
-
-    clapSource.connect(clapFilter);
-    clapFilter.connect(clapGain);
-    clapGain.connect(masterGain);
-
-    clapSource.start(t);
-    clapSource.stop(t + clapDuration + 0.05);
-  }
+  roar.start(now);
+  roar.stop(now + 2);
 }
 
-// Confetti
+/* ----------------------------------------------------------
+   CONFETTI + CROWN
+----------------------------------------------------------- */
+
 function launchConfetti() {
   if (typeof confetti !== "function") return;
-
-  const duration = 1200;
-  const end = Date.now() + duration;
-
+  const end = Date.now() + 1200;
   (function frame() {
     confetti({
       particleCount: 10,
       startVelocity: 25,
       spread: 70,
-      origin: { x: Math.random(), y: Math.random() - 0.2 },
+      origin: { x: Math.random(), y: Math.random() - 0.2 }
     });
-    if (Date.now() < end) {
-      requestAnimationFrame(frame);
-    }
+    if (Date.now() < end) requestAnimationFrame(frame);
   })();
 }
 
-/* ---------- CORE HELPERS ---------- */
+function showCrown() {
+  const crownEl = document.getElementById("winCrown");
+  if (!crownEl) return;
+  crownEl.classList.remove("hidden");
+  void crownEl.offsetWidth;
+  crownEl.classList.add("active");
+  setTimeout(() => {
+    crownEl.classList.remove("active");
+    crownEl.classList.add("hidden");
+  }, 2500);
+}
+
+function clapBurst() {
+  const container = document.getElementById("clapBurst");
+  if (!container) return;
+
+  container.innerHTML = "";
+  container.classList.remove("hidden");
+
+  for (let i = 0; i < 8; i++) {
+    const clap = document.createElement("div");
+    clap.classList.add("clap");
+    clap.textContent = "👏";
+    clap.style.left = 10 + Math.random() * 80 + "%";
+    clap.style.animationDelay = Math.random() * 0.3 + "s";
+    container.appendChild(clap);
+  }
+
+  setTimeout(() => {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+  }, 1600);
+}
+
+/* ----------------------------------------------------------
+   GAME LOGIC
+----------------------------------------------------------- */
 
 function setTurnDisplay() {
   turnBadge.textContent = current;
@@ -245,7 +242,7 @@ function setTurnDisplay() {
 }
 
 function clearWinningStyles() {
-  cells.forEach((c) => c.classList.remove("winning", "x", "o"));
+  cells.forEach(c => c.classList.remove("winning", "x", "o"));
 }
 
 function updateScoresDisplay() {
@@ -260,42 +257,39 @@ function checkWinner() {
       return { winner: board[a], line: [a, b, c] };
     }
   }
-  if (board.every((v) => v !== null)) {
+  if (board.every(v => v !== null)) {
     return { winner: "draw", line: [] };
   }
   return null;
 }
 
-// For AI: evaluate an arbitrary board state
+/* MINIMAX + RANDOM BOT ----------------------------------- */
+
 function evaluateBoard(state) {
   for (const [a, b, c] of WIN_LINES) {
     if (state[a] && state[a] === state[b] && state[a] === state[c]) {
-      return state[a]; // 'X' or 'O'
+      return state[a];
     }
   }
-  if (state.every((v) => v !== null)) return "draw";
+  if (state.every(v => v !== null)) return "draw";
   return null;
 }
 
 function getRandomMove() {
   const empty = [];
-  for (let i = 0; i < 9; i++) {
-    if (board[i] === null) empty.push(i);
-  }
+  for (let i = 0; i < 9; i++) if (board[i] === null) empty.push(i);
   if (!empty.length) return null;
-  const idx = Math.floor(Math.random() * empty.length);
-  return empty[idx];
+  return empty[Math.floor(Math.random() * empty.length)];
 }
 
-// Minimax for HARD / smart move
 function minimax(state, player) {
   const winner = evaluateBoard(state);
   if (winner === computerPlayer) return { score: 10 };
   if (winner === humanPlayer) return { score: -10 };
   if (winner === "draw") return { score: 0 };
 
-  const isMaximizing = player === computerPlayer;
-  let best = { score: isMaximizing ? -Infinity : Infinity, index: null };
+  const maximizing = player === computerPlayer;
+  let best = { score: maximizing ? -Infinity : Infinity, index: null };
 
   for (let i = 0; i < 9; i++) {
     if (state[i] === null) {
@@ -303,95 +297,48 @@ function minimax(state, player) {
       const result = minimax(state, player === "X" ? "O" : "X");
       state[i] = null;
 
-      if (isMaximizing) {
-        if (result.score > best.score) {
-          best = { score: result.score, index: i };
-        }
+      if (maximizing) {
+        if (result.score > best.score) best = { score: result.score, index: i };
       } else {
-        if (result.score < best.score) {
-          best = { score: result.score, index: i };
-        }
+        if (result.score < best.score) best = { score: result.score, index: i };
       }
     }
   }
+
   return best;
 }
 
 function getSmartMove() {
-  const copy = board.slice();
-  const result = minimax(copy, computerPlayer);
-  if (result && result.index !== null && result.index !== undefined) {
-    return result.index;
-  }
-  return getRandomMove();
+  const result = minimax(board.slice(), computerPlayer);
+  return result.index !== null ? result.index : getRandomMove();
 }
 
-/* ---------- GAME FLOW ---------- */
+/* ----------------------------------------------------------
+   GAME FLOW
+----------------------------------------------------------- */
 
 function finishGame(result) {
   if (!result) return;
   gameOver = true;
 
-  const { winner, line } = result;
-
-  if (winner === "draw") {
+  if (result.winner === "draw") {
     messageText.textContent = "It's a draw. Nobody wins.";
     scoreDraw++;
-    speak("It's a draw. Nobody wins.");
+    speak("It's a draw.");
   } else {
-    messageText.textContent = `Player ${winner} wins! 🎉`;
-    line.forEach((i) => cells[i].classList.add("winning"));
-    if (winner === "X") scoreX++;
-    if (winner === "O") scoreO++;
+    messageText.textContent = `Player ${result.winner} wins! 🎉`;
+    result.line.forEach(i => cells[i].classList.add("winning"));
+    if (result.winner === "X") scoreX++;
+    if (result.winner === "O") scoreO++;
 
-    playWinSound();          // stadium crowd roar + claps
-    launchConfetti();        // confetti
-    showCrown();             // 👑 crown animation
-    clapBurst();             // 👏 emojis falling
-    speak(`Congratulations! Player ${winner} wins!`);
+    playWinSound();
+    launchConfetti();
+    showCrown();
+    clapBurst();
+    speak(`Player ${result.winner} wins!`);
   }
 
   updateScoresDisplay();
-}
-
-function showCrown() {
-  const crownEl = document.getElementById("winCrown");
-  if (!crownEl) return;
-
-  crownEl.classList.remove("hidden");
-  void crownEl.offsetWidth; // Reset animation
-  crownEl.classList.add("active");
-
-  setTimeout(() => {
-    crownEl.classList.remove("active");
-    crownEl.classList.add("hidden");
-  }, 2500);
-}
-
-function clapBurst() {
-  const container = document.getElementById("clapBurst");
-  if (!container) return;
-
-  container.innerHTML = "";
-  container.classList.remove("hidden");
-
-  const count = 8;
-  for (let i = 0; i < count; i++) {
-    const clap = document.createElement("div");
-    clap.classList.add("clap");
-    clap.textContent = "👏";
-
-    const left = 10 + Math.random() * 80;
-    clap.style.left = left + "%";
-    clap.style.animationDelay = (Math.random() * 0.3) + "s";
-
-    container.appendChild(clap);
-  }
-
-  setTimeout(() => {
-    container.classList.add("hidden");
-    container.innerHTML = "";
-  }, 1600);
 }
 
 function resetBoard() {
@@ -401,14 +348,14 @@ function resetBoard() {
   isHumanTurn = true;
 
   clearWinningStyles();
-  cells.forEach((c) => (c.textContent = ""));
+  cells.forEach(c => c.textContent = "");
 
   setTurnDisplay();
 
   if (gameMode === "pvp") {
     messageText.textContent = "New round! Player X starts.";
   } else {
-    messageText.textContent = "Vs computer. You are X, tap a square.";
+    messageText.textContent = "Vs computer. You are X.";
   }
 }
 
@@ -418,7 +365,6 @@ function clearScores() {
   scoreDraw = 0;
   updateScoresDisplay();
   resetBoard();
-  messageText.textContent = "Scores cleared. Player X starts.";
 }
 
 function handleClick(e) {
@@ -427,12 +373,13 @@ function handleClick(e) {
 
   if (gameOver || board[idx] !== null) return;
 
-  /* ---------- PVP ---------- */
+  /* PVP ---------------------------------------------------------------- */
   if (gameMode === "pvp") {
     board[idx] = current;
     cell.textContent = current;
     cell.classList.add(current.toLowerCase());
 
+    playTapBeep();
     vibrate();
 
     const result = checkWinner();
@@ -444,13 +391,15 @@ function handleClick(e) {
     return;
   }
 
-  /* ---------- PVC: HUMAN PLAYS X ---------- */
+  /* PVC: HUMAN PLAY --------------------------------------------------- */
+
   if (!isHumanTurn) return;
 
   board[idx] = humanPlayer;
   cell.textContent = humanPlayer;
   cell.classList.add(humanPlayer.toLowerCase());
 
+  playTapBeep();
   vibrate();
 
   let result = checkWinner();
@@ -467,29 +416,20 @@ function handleClick(e) {
 function computerMove() {
   if (gameOver) return;
 
-  let moveIndex = null;
+  let move =
+    difficulty === "easy"   ? (Math.random() < 0.4 ? getSmartMove() : getRandomMove()) :
+    difficulty === "normal" ? (Math.random() < 0.8 ? getSmartMove() : getRandomMove()) :
+                              (Math.random() < 0.9 ? getSmartMove() : getRandomMove());
 
-  if (difficulty === "easy") {
-    // 40% smart, 60% random
-    const useSmart = Math.random() < 0.4;
-    moveIndex = useSmart ? getSmartMove() : getRandomMove();
-  } else if (difficulty === "normal") {
-    // 80% smart, 20% random
-    const useSmart = Math.random() < 0.8;
-    moveIndex = useSmart ? getSmartMove() : getRandomMove();
-  } else {
-    // HARD: 90% smart, 10% random
-    const useSmart = Math.random() < 0.9;
-    moveIndex = useSmart ? getSmartMove() : getRandomMove();
-  }
+  if (move == null) return;
 
-  if (moveIndex === null || moveIndex === undefined) return;
-
-  board[moveIndex] = computerPlayer;
-
-  const cell = cells[moveIndex];
+  board[move] = computerPlayer;
+  const cell = cells[move];
   cell.textContent = computerPlayer;
   cell.classList.add(computerPlayer.toLowerCase());
+
+  playTapBeep();
+  vibrate();
 
   let result = checkWinner();
   if (result) return finishGame(result);
@@ -500,26 +440,23 @@ function computerMove() {
   messageText.textContent = "Your turn!";
 }
 
-/* ---------- MODE + DIFFICULTY SWITCH ---------- */
+/* ----------------------------------------------------------
+   MODE + DIFFICULTY SWITCH
+----------------------------------------------------------- */
 
 function setDifficulty(level) {
   difficulty = level;
-  diffButtons.forEach((btn) => {
-    if (btn.getAttribute("data-level") === level) {
-      btn.classList.add("diff-active");
-    } else {
-      btn.classList.remove("diff-active");
-    }
-  });
+  diffButtons.forEach(btn =>
+    btn.classList.toggle("diff-active", btn.getAttribute("data-level") === level)
+  );
 }
 
-diffButtons.forEach((btn) => {
+diffButtons.forEach(btn => {
   btn.addEventListener("click", () => {
-    const level = btn.getAttribute("data-level");
-    setDifficulty(level);
+    setDifficulty(btn.getAttribute("data-level"));
     if (gameMode === "pvc") {
       resetBoard();
-      messageText.textContent = `Vs computer (${level} mode). You are X.`;
+      messageText.textContent = `Vs computer (${difficulty}). You are X.`;
     }
   });
 });
@@ -528,9 +465,7 @@ modePvpBtn.addEventListener("click", () => {
   gameMode = "pvp";
   modePvpBtn.classList.add("mode-active");
   modePvcBtn.classList.remove("mode-active");
-
   difficultyRow.classList.add("hidden");
-
   resetBoard();
   messageText.textContent = "Two players. Player X starts.";
 });
@@ -539,53 +474,54 @@ modePvcBtn.addEventListener("click", () => {
   gameMode = "pvc";
   modePvcBtn.classList.add("mode-active");
   modePvpBtn.classList.remove("mode-active");
-
   difficultyRow.classList.remove("hidden");
-  setDifficulty(difficulty || "easy");
-
+  setDifficulty(difficulty);
   resetBoard();
   messageText.textContent = "Vs computer. You are X.";
 });
 
-/* ---------- BUTTONS ---------- */
+/* ----------------------------------------------------------
+   BUTTONS
+----------------------------------------------------------- */
 
-cells.forEach((cell) => cell.addEventListener("click", handleClick));
+cells.forEach(c => c.addEventListener("click", handleClick));
 resetBtn.addEventListener("click", resetBoard);
 clearScoreBtn.addEventListener("click", clearScores);
 
 if (avToggleBtn) {
   avToggleBtn.addEventListener("click", () => {
-    const idx = AV_MODES.indexOf(avMode);
-    const nextIdx = (idx + 1) % AV_MODES.length;
-    avMode = AV_MODES[nextIdx];
+    avMode = AV_MODES[(AV_MODES.indexOf(avMode) + 1) % AV_MODES.length];
     saveAvMode();
     updateAvUI();
   });
 }
 
-/* ---------- THEME ---------- */
+/* ----------------------------------------------------------
+   THEME
+----------------------------------------------------------- */
 
 function applyTheme(mode) {
-  const body = document.body;
   if (mode === "light") {
-    body.classList.add("light-mode");
+    document.body.classList.add("light-mode");
     themeToggleBtn.textContent = "🌙 Dark";
   } else {
-    body.classList.remove("light-mode");
+    document.body.classList.remove("light-mode");
     themeToggleBtn.textContent = "☀️ Light";
   }
   localStorage.setItem("ttt_theme", mode);
 }
 
-const storedTheme = localStorage.getItem("ttt_theme") || "dark";
-applyTheme(storedTheme);
+applyTheme(localStorage.getItem("ttt_theme") || "dark");
 
 themeToggleBtn.addEventListener("click", () => {
   const isLight = document.body.classList.contains("light-mode");
   applyTheme(isLight ? "dark" : "light");
 });
 
-/* ---------- INIT ---------- */
+/* ----------------------------------------------------------
+   INIT
+----------------------------------------------------------- */
+
 setTurnDisplay();
 updateScoresDisplay();
 updateAvUI();
