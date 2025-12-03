@@ -50,6 +50,9 @@ let humanPlayer = "X";
 let computerPlayer = "O";
 let isHumanTurn = true;
 
+// Who won the last completed game? "X", "O" or "draw"
+let lastWinnerMarker = null;
+
 let difficulty = "easy";      // "easy" | "normal" | "hard"
 
 const WIN_LINES = [
@@ -332,10 +335,14 @@ function finishGame(result) {
   gameOver = true;
 
   if (result.winner === "draw") {
+    lastWinnerMarker = "draw";  // ⬅️ draw means next game: human starts
     messageText.textContent = "It's a draw. Nobody wins.";
     scoreDraw++;
     speak("It's a draw.");
   } else {
+    // Remember who won: "X" or "O"
+    lastWinnerMarker = result.winner;
+
     messageText.textContent = `Player ${result.winner} wins! 🎉`;
     result.line.forEach(i => cells[i].classList.add("winning"));
     if (result.winner === "X") scoreX++;
@@ -354,18 +361,42 @@ function finishGame(result) {
 function resetBoard() {
   board = Array(9).fill(null);
   gameOver = false;
-  current = "X";
-  isHumanTurn = true;
 
   clearWinningStyles();
-  cells.forEach(c => c.textContent = "");
-
-  setTurnDisplay();
+  cells.forEach(c => (c.textContent = ""));
 
   if (gameMode === "pvp") {
+    // 2-players: always X starts
+    current = "X";
+    isHumanTurn = true;
+    setTurnDisplay();
     messageText.textContent = "Two players. Player X starts.";
+    return;
+  }
+
+  // VS COMPUTER MODE (PVC)
+  // Rule:
+  //  - If AI (O) won last game -> AI starts next
+  //  - If human (X) won or draw -> human starts
+  if (lastWinnerMarker === computerPlayer) {
+    // AI starts this round
+    current = computerPlayer;   // "O"
+    isHumanTurn = false;
+    setTurnDisplay();
+    messageText.textContent = `Vs computer (${difficulty}). Computer starts...`;
+
+    // Small delay so it feels like "thinking"
+    setTimeout(() => {
+      if (!gameOver) {
+        computerMove();
+      }
+    }, 450);
   } else {
-    messageText.textContent = `Vs computer (${difficulty}). You are X.`;
+    // Human starts (default, or after human win, or after draw)
+    current = humanPlayer;      // "X"
+    isHumanTurn = true;
+    setTurnDisplay();
+    messageText.textContent = `Vs computer (${difficulty}). You are ${humanPlayer}. Your turn!`;
   }
 }
 
@@ -373,6 +404,7 @@ function clearScores() {
   scoreX = 0;
   scoreO = 0;
   scoreDraw = 0;
+  lastWinnerMarker = null;  // back to default: human starts
   updateScoresDisplay();
   resetBoard();
 }
@@ -427,7 +459,7 @@ function computerMove() {
   if (gameOver) return;
 
   let move =
-    difficulty === "easy"   ? (Math.random() < 0.5 ? getSmartMove() : getRandomMove()) :
+    difficulty === "easy"   ? (Math.random() < 0.6 ? getSmartMove() : getRandomMove()) :
     difficulty === "normal" ? (Math.random() < 0.8 ? getSmartMove() : getRandomMove()) :
                               (Math.random() < 0.9 ? getSmartMove() : getRandomMove());
 
@@ -473,10 +505,11 @@ diffButtons.forEach(btn => {
 
 modePvpBtn.addEventListener("click", () => {
   gameMode = "pvp";
+  lastWinnerMarker = null;  // reset starter logic
   modePvpBtn.classList.add("mode-active");
   modePvcBtn.classList.remove("mode-active");
 
-  hideLevelRow();   // 🔒 NEVER show Level row in 2 Players
+  hideLevelRow();
 
   resetBoard();
   messageText.textContent = "Two players. Player X starts.";
@@ -484,14 +517,15 @@ modePvpBtn.addEventListener("click", () => {
 
 modePvcBtn.addEventListener("click", () => {
   gameMode = "pvc";
+  lastWinnerMarker = null;  // fresh start: human first
   modePvcBtn.classList.add("mode-active");
   modePvpBtn.classList.remove("mode-active");
 
-  showLevelRow();   // 👀 ONLY show Level row in Vs Computer
+  showLevelRow();
   setDifficulty(difficulty);
 
   resetBoard();
-  messageText.textContent = `Vs computer (${difficulty}). You are X.`;
+  // resetBoard() already sets the correct message depending on starter
 });
 
 /* ----------------------------------------------------------

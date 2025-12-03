@@ -13,52 +13,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <div class="wrap">
+    <div class="wrap">
     <div class="title">Tic Tac Toe 🎮</div>
     <div class="subtitle">Two players · Local game · First to 3 wins? ⭐</div>
 
-    <!-- TOP BAR: modes left, sound/light right -->
-    <div
-      style="
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        margin-bottom:4px;
-      "
-    >
-      <!-- LEFT COLUMN: Game modes + Level row -->
-      <div style="display:flex; flex-direction:column;">
-
-        <!-- Game modes -->
-        <div class="mode-toggle" style="display:flex; gap:6px; margin-bottom:4px;">
-          <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
-          <button id="mode-pvc" class="mode-btn">Vs Computer</button>
-        </div>
-
-        <!-- LEVEL (aligned directly under 2 Players) -->
-        <div
-          id="difficultyRow"
-          class="difficulty-row hidden"
-          style="
-            margin-top:-2px;
-            margin-bottom:10px;
-            font-size:0.85rem;
-            display:flex;
-            align-items:center;
-            gap:6px;
-          "
-        >
-          <span class="difficulty-label" style="margin-right:6px;">Level:</span>
-
-          <button class="diff-btn diff-active" data-level="easy">Easy</button>
-          <button class="diff-btn" data-level="normal">Normal</button>
-          <button class="diff-btn" data-level="hard">Hard</button>
-        </div>
-
+    <!-- TOP BAR: left = modes, right = sound/light -->
+    <div class="top-bar">
+      <!-- LEFT: Game modes -->
+      <div class="mode-toggle">
+        <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
+        <button id="mode-pvc" class="mode-btn">Vs Computer</button>
       </div>
 
-      <!-- RIGHT COLUMN: Sound + Theme -->
-      <div style="display:flex; align-items:center; gap:6px;">
+      <!-- RIGHT: Sound + Theme -->
+      <div class="top-right">
         <button
           id="avToggle"
           class="btn btn-ghost"
@@ -75,6 +43,21 @@
         </button>
       </div>
     </div>
+
+    <!-- LEVEL (directly under 2 Players / Vs Computer) -->
+    <div
+      id="difficultyRow"
+      class="difficulty-row hidden"
+      style="margin-top:-4px; margin-bottom:10px; font-size:0.85rem;"
+    >
+      <span class="difficulty-label" style="margin-right:6px;">Level:</span>
+
+      <button class="diff-btn diff-active" data-level="easy">Easy</button>
+      <button class="diff-btn" data-level="normal">Normal</button>
+      <button class="diff-btn" data-level="hard">Hard</button>
+    </div>
+
+    <!-- STATUS BAR -->
 
     <!-- STATUS BAR -->
     <div class="status">
