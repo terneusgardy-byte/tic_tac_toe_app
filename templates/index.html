@@ -112,8 +112,8 @@
     src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_c1a96514fa.mp3?filename=small-crowd-applause-6695.mp3">
   </audio>
 
-  <!-- Confetti -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <!-- Confetti (local, works offline) -->
+  <script src="{{ url_for('static', filename='vendor/canvas-confetti.min.js') }}"></script>
 
   <!-- Main JS -->
   <script src="{{ url_for('static', filename='script.js') }}"></script>

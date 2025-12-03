@@ -11,6 +11,7 @@ const ASSETS = [
   "/static/manifest.json",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
+  "/static/vendor/canvas-confetti.min.js",
 ];
 
 // INSTALL — cache core assets
