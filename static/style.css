@@ -450,14 +450,22 @@ body.light-mode .diff-active {
   padding: 16px 12px 24px;
 }
 
-/* Top bar wraps cleanly on small screens */
+/* Top bar: modes on the left, sound/light on the right */
 .top-bar {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: nowrap;      /* keep everything on one line */
   gap: 8px;
   width: 100%;
+}
+
+/* Push SOUND / Light to the right */
+.top-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Keep mode buttons from shrinking */
@@ -483,8 +491,7 @@ body.light-mode .diff-active {
   }
 
   .top-bar {
-    row-gap: 6px;
-    justify-content: space-between;
+    gap: 6px;
   }
 
   .mode-btn,
@@ -514,4 +521,14 @@ body.light-mode .diff-active {
   .top-bar {
     gap: 10px;
   }
+}
+
+/* Small toggle for compact Light button (if you add .small-toggle in HTML) */
+.small-toggle {
+  min-width: auto;
+  width: auto;
+  padding: 4px 10px !important;
+  font-size: 0.7rem !important;
+  line-height: 1.2;
+  white-space: nowrap;
 }

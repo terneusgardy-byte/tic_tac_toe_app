@@ -17,32 +17,33 @@
     <div class="title">Tic Tac Toe 🎮</div>
     <div class="subtitle">Two players · Local game · First to 3 wins? ⭐</div>
 
-    <!-- TOP BAR: left = modes, right = sound/light -->
-    <div class="top-bar">
-      <!-- LEFT: Game modes -->
-      <div class="mode-toggle">
-        <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
-        <button id="mode-pvc" class="mode-btn">Vs Computer</button>
-      </div>
+  <!-- TOP BAR: left = modes, right = sound/light -->
+<div class="top-bar">
+  <!-- LEFT: Game modes -->
+  <div class="mode-toggle">
+    <button id="mode-pvp" class="mode-btn mode-active">2 Players</button>
+    <button id="mode-pvc" class="mode-btn">Vs Computer</button>
+    <button id="mode-online" class="mode-btn">Online</button>
+  </div>
 
-      <!-- RIGHT: Sound + Theme -->
-      <div class="top-right">
-        <button
-          id="avToggle"
-          class="btn btn-ghost"
-          style="padding:6px 12px; font-size:0.8rem;"
-        >
-          🔊 SOUND ON
-        </button>
-        <button
-          id="themeToggle"
-          class="btn btn-ghost"
-          style="padding:6px 12px; font-size:0.8rem;"
-        >
-          ☀️ Light
-        </button>
-      </div>
-    </div>
+  <!-- RIGHT: Sound + Theme -->
+  <div class="top-right">
+    <button
+      id="avToggle"
+      class="btn btn-ghost"
+      style="padding:6px 12px; font-size:0.8rem;"
+    >
+      🔊 SOUND ON
+    </button>
+    <button
+      id="themeToggle"
+      class="btn btn-ghost"
+      style="padding:6px 12px; font-size:0.8rem;"
+    >
+      ☀️ Light
+    </button>
+  </div>
+</div>
 
     <!-- LEVEL (directly under 2 Players / Vs Computer) -->
     <div
@@ -58,27 +59,34 @@
     </div>
 
     <!-- STATUS BAR -->
+<div class="status">
+  <div class="turn" id="turnText">
+    Turn: <span id="turnBadge">X</span>
+  </div>
+  <div class="message" id="messageText">Player X starts. Tap a square.</div>
+</div>
 
-    <!-- STATUS BAR -->
-    <div class="status">
-      <div class="turn" id="turnText">
-        Turn: <span id="turnBadge">X</span>
-      </div>
-      <div class="message" id="messageText">Player X starts. Tap a square.</div>
-    </div>
+<!-- ONLINE CONTROLS (Host / Join) -->
+<div id="onlineControls" class="online-controls hidden">
+  <button id="onlineHostBtn" class="btn btn-primary small-btn">Start match</button>
+  <button id="onlineJoinBtn" class="btn btn-link small-btn">Join with code</button>
+</div>
 
-    <!-- BOARD -->
-    <div class="board" id="board">
-      <div class="cell" data-idx="0"></div>
-      <div class="cell" data-idx="1"></div>
-      <div class="cell" data-idx="2"></div>
-      <div class="cell" data-idx="3"></div>
-      <div class="cell" data-idx="4"></div>
-      <div class="cell" data-idx="5"></div>
-      <div class="cell" data-idx="6"></div>
-      <div class="cell" data-idx="7"></div>
-      <div class="cell" data-idx="8"></div>
-    </div>
+<!-- ONLINE STATUS LINE (Room + Share) -->
+<div class="online-status hidden" id="onlineStatus"></div>
+
+<!-- BOARD -->
+<div class="board" id="board">
+  <div class="cell" data-idx="0"></div>
+  <div class="cell" data-idx="1"></div>
+  <div class="cell" data-idx="2"></div>
+  <div class="cell" data-idx="3"></div>
+  <div class="cell" data-idx="4"></div>
+  <div class="cell" data-idx="5"></div>
+  <div class="cell" data-idx="6"></div>
+  <div class="cell" data-idx="7"></div>
+  <div class="cell" data-idx="8"></div>
+</div>
 
     <!-- CONTROLS -->
     <div class="controls">
