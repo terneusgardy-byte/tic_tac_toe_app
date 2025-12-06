@@ -146,6 +146,12 @@ function vibrate() {
   navigator.vibrate(25);
 }
 
+function vibrateWin() {
+  if (!isVibrateEnabled()) return;
+  if (!navigator.vibrate) return;
+  navigator.vibrate([80, 40, 80]);
+}
+
 /* AUDIO ENGINE (tap beep + win sound) --------------------- */
 
 let audioCtx = null;
@@ -667,6 +673,7 @@ function finishGame(result) {
     if (result.winner === "O") scoreO++;
 
     playWinSound();
+    vibrateWin();    // strong vibration for win
     launchConfetti();
     showCrown();
     clapBurst();
