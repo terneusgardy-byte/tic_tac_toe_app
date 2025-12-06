@@ -654,3 +654,28 @@ body.light-mode .diff-active {
   filter: none !important;
   mix-blend-mode: normal !important;
 }
+
+/* QUICK FIX: Prevent controls from wrapping or shifting */
+.top-controls, .mode-buttons, .toggle-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow-x: auto;       /* allow scroll instead of wrap if needed */
+  scrollbar-width: none;  /* hide scrollbar (Firefox) */
+}
+
+.top-controls::-webkit-scrollbar,
+.mode-buttons::-webkit-scrollbar,
+.toggle-buttons::-webkit-scrollbar {
+  display: none;          /* hide scrollbar (Safari/Chrome) */
+}
+
+/* Prevent buttons from stretching too tall or wide */
+.top-controls button,
+.mode-buttons button,
+.toggle-buttons button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
