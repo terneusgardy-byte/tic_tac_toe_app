@@ -19,14 +19,14 @@ const modePvpBtn    = document.getElementById("mode-pvp");
 const modePvcBtn    = document.getElementById("mode-pvc");
 const modeOnlineBtn = document.getElementById("mode-online");
 
-const levelRow = document.getElementById("difficultyRow");
-const diffButtons = Array.from(document.querySelectorAll(".diff-btn"));
+const levelRow     = document.getElementById("difficultyRow");
+const diffButtons  = Array.from(document.querySelectorAll(".diff-btn"));
 
-const avToggleBtn     = document.getElementById("avToggle");
-const onlineControls  = document.getElementById("onlineControls");
-const onlineHostBtn   = document.getElementById("onlineHostBtn");
-const onlineJoinBtn   = document.getElementById("onlineJoinBtn");
-const onlineStatusEl  = document.getElementById("onlineStatus");
+const avToggleBtn    = document.getElementById("avToggle");
+const onlineControls = document.getElementById("onlineControls");
+const onlineHostBtn  = document.getElementById("onlineHostBtn");
+const onlineJoinBtn  = document.getElementById("onlineJoinBtn");
+const onlineStatusEl = document.getElementById("onlineStatus");
 
 /* Helpers to show/hide the Level row only when we want */
 function showLevelRow() {
@@ -54,8 +54,6 @@ function setOnlineStatus(html) {
   }
 }
 
-/* 🔥 ADD THIS RIGHT AFTER setOnlineStatus */
-
 function lockModeButtonsForOnline(isLocked) {
   [modePvpBtn, modePvcBtn].forEach(btn => {
     if (!btn) return;
@@ -67,7 +65,7 @@ function lockModeButtonsForOnline(isLocked) {
    GAME STATE
 ----------------------------------------------------------- */
 
-let board = Array(9).fill(null);
+let board   = Array(9).fill(null);
 let current = "X";
 let gameOver = false;
 
@@ -75,10 +73,10 @@ let scoreX = 0;
 let scoreO = 0;
 let scoreDraw = 0;
 
-let gameMode = "pvp";         // "pvp" | "pvc" | "online"
-let humanPlayer = "X";
+let gameMode = "pvp";   // "pvp" | "pvc" | "online"
+let humanPlayer    = "X";
 let computerPlayer = "O";
-let isHumanTurn = true;
+let isHumanTurn    = true;
 
 // Who won the last completed game? "X", "O" or "draw"
 let lastWinnerMarker = null;
@@ -86,7 +84,7 @@ let lastWinnerMarker = null;
 let difficulty = "easy";      // "easy" | "normal" | "hard"
 
 /* Online mode backend state */
-let onlineRoomId    = null;   // e.g. "RWW4S9"
+let onlineRoomId    = null;   // e.g. "ABC123"
 let onlinePlayer    = null;   // "X" or "O"
 let onlinePollTimer = null;
 
@@ -306,7 +304,8 @@ function setTurnDisplay() {
 }
 
 function clearWinningStyles() {
-  cells.forEach(c => c.classList.remove("winning", "x", "o"));
+  // Only remove the orange win glow; keep X/O color classes
+  cells.forEach(c => c.classList.remove("winning"));
 }
 
 function updateScoresDisplay() {
@@ -349,8 +348,8 @@ function getRandomMove() {
 function minimax(state, player) {
   const winner = evaluateBoard(state);
   if (winner === computerPlayer) return { score: 10 };
-  if (winner === humanPlayer) return { score: -10 };
-  if (winner === "draw") return { score: 0 };
+  if (winner === humanPlayer)    return { score: -10 };
+  if (winner === "draw")         return { score: 0 };
 
   const maximizing = player === computerPlayer;
   let best = { score: maximizing ? -Infinity : Infinity, index: null };
@@ -377,13 +376,60 @@ function getSmartMove() {
   return result.index !== null ? result.index : getRandomMove();
 }
 
+function computerMove() {
+  if (gameMode !== "pvc" || gameOver) return;
+
+  let smartChance = 0;
+
+  if (difficulty === "easy") {
+    smartChance = 0.60; // 60% smart, 40% random
+  } else if (difficulty === "normal") {
+    smartChance = 0.80; // 80/20
+  } else {
+    smartChance = 0.90; // 90/10
+  }
+
+  let moveIndex;
+
+  // Decide smart vs random
+  if (Math.random() < smartChance) {
+    moveIndex = getSmartMove();
+  } else {
+    moveIndex = getRandomMove();
+  }
+
+  if (moveIndex === null) return; // no moves left
+
+  board[moveIndex] = computerPlayer;
+  const cell = cells[moveIndex];
+  cell.textContent = computerPlayer;
+  cell.classList.add(computerPlayer.toLowerCase());
+
+  playTapBeep();
+  vibrate();
+
+  const result = checkWinner();
+  if (result) {
+    finishGame(result);
+    return;
+  }
+
+  // hand turn back to human
+  current = humanPlayer;
+  isHumanTurn = true;
+  setTurnDisplay();
+  if (messageText) {
+    messageText.textContent = `Vs computer (${difficulty}). Your turn!`;
+  }
+}
+
 /* ----------------------------------------------------------
    ONLINE HELPERS – SYNC WITH SERVER
 ----------------------------------------------------------- */
 
 function applyServerBoard(serverBoard) {
   board = serverBoard.slice();
-  clearWinningStyles();
+  // ❌ do NOT clearWinningStyles here, so winning glow can stay
 
   for (let i = 0; i < 9; i++) {
     const cell = cells[i];
@@ -400,11 +446,15 @@ async function fetchRoomStateOnce() {
   if (!onlineRoomId || gameMode !== "online") return;
 
   try {
-    const res = await fetch(`/api/room_state/${onlineRoomId}`);
+    const res  = await fetch(`/api/room_state/${onlineRoomId}`);
     const data = await res.json();
 
     if (!res.ok || data.error) {
       console.error("room_state error:", data);
+      // If the room vanished, auto-exit to local mode
+      if (res.status === 404 || (data && data.error === "Room not found")) {
+        leaveOnlineMode("Opponent left the match. Back to local 2 players.");
+      }
       return;
     }
 
@@ -437,6 +487,22 @@ async function fetchRoomStateOnce() {
     if (!gameOver && messageText) {
       messageText.textContent = `Online. Player ${current}, your move.`;
     }
+
+    // 5) If game is finished and opponent pressed "Ready", tell this player.
+    if (
+      gameMode === "online" &&
+      onlineRoomId &&
+      onlinePlayer &&
+      data.status === "finished" &&
+      gameOver
+    ) {
+      const opponentReady =
+        onlinePlayer === "X" ? !!data.ready_O : !!data.ready_X;
+
+      if (opponentReady && messageText) {
+        messageText.textContent = "Opponent is ready.";
+      }
+    }
   } catch (err) {
     console.error("Polling error:", err);
   }
@@ -451,6 +517,44 @@ function stopOnlinePolling() {
   if (onlinePollTimer) {
     clearInterval(onlinePollTimer);
     onlinePollTimer = null;
+  }
+}
+
+/* Leave Online mode on THIS device (used by Stop or room closed) */
+function leaveOnlineMode(msg) {
+  // Stop talking to the server
+  stopOnlinePolling();
+  onlineRoomId = null;
+  onlinePlayer = null;
+  gameMode = "pvp";
+
+  // Unlock mode buttons
+  lockModeButtonsForOnline(false);
+
+  // Hide online controls + status line
+  showOnlineControls(false);
+  setOnlineStatus("");
+
+  // Visually go back to 2 Players mode
+  if (modePvpBtn) modePvpBtn.classList.add("mode-active");
+  if (modePvcBtn) modePvcBtn.classList.remove("mode-active");
+  if (modeOnlineBtn) {
+    modeOnlineBtn.classList.remove("mode-active");
+    modeOnlineBtn.textContent = "Online";
+  }
+
+  // Reset local board / state
+  board = Array(9).fill(null);
+  gameOver = false;
+  isRematchAvailable = false;
+  setResetButtonLabel(false);
+  clearWinningStyles();
+  cells.forEach(c => { c.textContent = ""; });
+  current = "X";
+  setTurnDisplay();
+
+  if (messageText) {
+    messageText.textContent = msg || "Online game stopped. Back to local 2 players.";
   }
 }
 
@@ -546,13 +650,18 @@ function finishGame(result) {
 
   if (result.winner === "draw") {
     lastWinnerMarker = "draw";
-    messageText.textContent = "It's a draw. Nobody wins.";
+    if (messageText) messageText.textContent = "It's a draw. Nobody wins.";
     scoreDraw++;
     speak("It's a draw.");
+
+    setResetButtonLabel(true);
+    resetBtn.disabled = false;
   } else {
     lastWinnerMarker = result.winner;
 
-    messageText.textContent = `Player ${result.winner} wins! 🎉`;
+    if (messageText) {
+      messageText.textContent = `Player ${result.winner} wins! 🎉`;
+    }
     result.line.forEach(i => cells[i].classList.add("winning"));
     if (result.winner === "X") scoreX++;
     if (result.winner === "O") scoreO++;
@@ -562,9 +671,35 @@ function finishGame(result) {
     showCrown();
     clapBurst();
     speak(`Player ${result.winner} wins!`);
+
+    // Online: winner gets "Rematch", loser gets "Ready"
+    if (gameMode === "online" && onlineRoomId && onlinePlayer) {
+      if (onlinePlayer === lastWinnerMarker) {
+        // I AM the winner → I control the rematch
+        setResetButtonLabel(true);   // "Rematch"
+        resetBtn.disabled = false;
+      } else {
+        // I AM the loser → I only say I'm ready
+        resetBtn.disabled = false;
+        resetBtn.innerHTML = `<span class="icon">✅</span> Ready`;
+      }
+    } else {
+      // Local modes (2 players / vs computer)
+      setResetButtonLabel(true);
+      resetBtn.disabled = false;
+    }
   }
 
   updateScoresDisplay();
+}
+
+/* Wipe only the local board (used by loser Ready) */
+function clearLocalBoardOnly() {
+  board = Array(9).fill(null);
+  clearWinningStyles();
+  cells.forEach(c => {
+    c.textContent = "";
+  });
 }
 
 async function resetBoard() {
@@ -608,7 +743,17 @@ async function resetBoard() {
 
       if (!res.ok || data.error) {
         console.error("reset_room error:", data);
-        alert(data.error || "Failed to reset online room");
+
+        // Room destroyed or vanished
+        if (res.status === 404 || (data && data.error === "Room not found")) {
+          leaveOnlineMode("Opponent left the match. Back to local 2 players.");
+        }
+        return;
+      }
+
+      // If the room is closed, auto-exit
+      if (data.status === "closed") {
+        leaveOnlineMode("Opponent left the match. Back to local 2 players.");
         return;
       }
 
@@ -619,7 +764,7 @@ async function resetBoard() {
       setResetButtonLabel(false);
 
       clearWinningStyles();
-      cells.forEach((c) => (c.textContent = ""));
+      cells.forEach(c => (c.textContent = ""));
 
       current = data.current_turn || "X";
       setTurnDisplay();
@@ -628,7 +773,6 @@ async function resetBoard() {
         messageText.textContent = `Online rematch. Player ${current} starts.`;
       }
 
-      // Make sure we are polling the new game state
       startOnlinePolling();
       await fetchRoomStateOnce();
       return;
@@ -648,16 +792,20 @@ async function resetBoard() {
   gameOver = false;
 
   clearWinningStyles();
-  cells.forEach((c) => (c.textContent = ""));
+  cells.forEach(c => (c.textContent = ""));
 
   // 2-player local
   if (gameMode === "pvp") {
     if (lastWinnerMarker === "X" || lastWinnerMarker === "O") {
       current = lastWinnerMarker;
-      messageText.textContent = `Rematch. Player ${current} starts.`;
+      if (messageText) {
+        messageText.textContent = `Rematch. Player ${current} starts.`;
+      }
     } else {
       current = "X";
-      messageText.textContent = "Two players. Player X starts.";
+      if (messageText) {
+        messageText.textContent = "Two players. Player X starts.";
+      }
     }
     isHumanTurn = true;
     setTurnDisplay();
@@ -669,7 +817,9 @@ async function resetBoard() {
     current = computerPlayer;
     isHumanTurn = false;
     setTurnDisplay();
-    messageText.textContent = `Vs computer (${difficulty}). Computer starts...`;
+    if (messageText) {
+      messageText.textContent = `Vs computer (${difficulty}). Computer starts...`;
+    }
 
     setTimeout(() => {
       if (!gameOver) {
@@ -680,11 +830,29 @@ async function resetBoard() {
     current = humanPlayer;
     isHumanTurn = true;
     setTurnDisplay();
-    messageText.textContent = `Vs computer (${difficulty}). You are ${humanPlayer}. Your turn!`;
+    if (messageText) {
+      messageText.textContent = `Vs computer (${difficulty}). You are ${humanPlayer}. Your turn!`;
+    }
   }
 }
 
 function clearScores() {
+  // In ONLINE mode, when the game is finished:
+  // only the WINNER can use Clear scores (which also triggers resetBoard()).
+  if (gameMode === "online" && gameOver) {
+    if (lastWinnerMarker === "X" || lastWinnerMarker === "O") {
+      if (onlinePlayer && onlinePlayer !== lastWinnerMarker) {
+        if (messageText) {
+          messageText.textContent =
+            `Wait for Player ${lastWinnerMarker} to start the next match.`;
+        }
+        return; // do nothing
+      }
+    }
+    // If it was a draw, both players are allowed to clear scores.
+  }
+
+  // Normal behavior (local modes, or allowed online winner)
   scoreX = 0;
   scoreO = 0;
   scoreDraw = 0;
@@ -718,7 +886,7 @@ async function handleClick(e) {
 
   if (gameOver || board[idx] !== null) return;
 
-  /* ONLINE – real backend mode */
+  /* ONLINE – backend mode */
   if (gameMode === "online") {
     if (!onlineRoomId || !onlinePlayer) {
       alert("You are not connected to an online room.");
@@ -790,7 +958,9 @@ async function handleClick(e) {
 
     current = current === "X" ? "O" : "X";
     setTurnDisplay();
-    messageText.textContent = `Player ${current}, your move.`;
+    if (messageText) {
+      messageText.textContent = `Player ${current}, your move.`;
+    }
     return;
   }
 
@@ -811,7 +981,9 @@ async function handleClick(e) {
   }
 
   isHumanTurn = false;
-  messageText.textContent = "Computer is thinking...";
+  if (messageText) {
+    messageText.textContent = "Computer is thinking...";
+  }
 
   setTimeout(() => {
     computerMove();
@@ -834,7 +1006,9 @@ diffButtons.forEach(btn => {
     setDifficulty(btn.getAttribute("data-level"));
     if (gameMode === "pvc") {
       resetBoard();
-      messageText.textContent = `Vs computer (${difficulty}). You are X.`;
+      if (messageText) {
+        messageText.textContent = `Vs computer (${difficulty}). You are X.`;
+      }
     }
   });
 });
@@ -858,7 +1032,9 @@ modePvpBtn.addEventListener("click", () => {
 
   hideLevelRow();
   resetBoard();
-  messageText.textContent = "Two players. Player X starts.";
+  if (messageText) {
+    messageText.textContent = "Two players. Player X starts.";
+  }
 });
 
 modePvcBtn.addEventListener("click", () => {
@@ -885,28 +1061,23 @@ modePvcBtn.addEventListener("click", () => {
 
 /* ONLINE MODE BUTTON – Online <-> Stop */
 if (modeOnlineBtn) {
-  modeOnlineBtn.addEventListener("click", () => {
+  modeOnlineBtn.addEventListener("click", async () => {
     // If already in an active online room → treat click as STOP
     if (gameMode === "online" && onlineRoomId) {
-      stopOnlinePolling();
-      onlineRoomId = null;
-      onlinePlayer = null;
-      gameMode = "pvp";
-
-      lockModeButtonsForOnline(false);
-      showOnlineControls(false);
-      setOnlineStatus("");
-
-      // Switch mode highlight back to 2 Players
-      modePvpBtn.classList.add("mode-active");
-      modePvcBtn.classList.remove("mode-active");
-      modeOnlineBtn.classList.remove("mode-active");
-      modeOnlineBtn.textContent = "Online";
-
-      resetBoard();
-      if (messageText) {
-        messageText.textContent = "Online game stopped. Back to local 2 players.";
+      try {
+        await fetch("/api/leave_room", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            room_id: onlineRoomId,
+            player: onlinePlayer || "X",
+          }),
+        });
+      } catch (err) {
+        console.error("leave_room error:", err);
       }
+
+      leaveOnlineMode("Online game stopped. Back to local 2 players.");
       return;
     }
 
@@ -974,7 +1145,6 @@ if (onlineHostBtn) {
           `Share the link with your friend to join.`;
       }
 
-      // Inline Share button in the status line
       const shareBtn = document.getElementById("shareLinkBtn");
       if (shareBtn) {
         shareBtn.addEventListener("click", () => {
@@ -982,13 +1152,12 @@ if (onlineHostBtn) {
         });
       }
 
-      // 🔹 HIDE Start / Join row once the room is ready
       showOnlineControls(false);
 
       startOnlinePolling();
       await fetchRoomStateOnce();
 
-      // Also auto-open share (nice for kids)
+      // Auto-open share for convenience
       await offerShareLink();
     } catch (err) {
       console.error("Network error creating room:", err);
@@ -1006,9 +1175,7 @@ if (onlineJoinBtn) {
 
     const ok = await joinRoomByCode(roomCode);
     if (ok) {
-      // 🔹 Hide Start / Join row while playing
       showOnlineControls(false);
-      // Status text already set in joinRoomByCode
     }
   });
 }
@@ -1018,7 +1185,45 @@ if (onlineJoinBtn) {
 ----------------------------------------------------------- */
 
 cells.forEach(c => c.addEventListener("click", handleClick));
-resetBtn.addEventListener("click", resetBoard);
+
+resetBtn.addEventListener("click", async () => {
+  // Special case: ONLINE + game finished + I am the LOSER
+  if (
+    gameMode === "online" &&
+    onlineRoomId &&
+    onlinePlayer &&
+    lastWinnerMarker !== "draw" &&
+    lastWinnerMarker &&
+    onlinePlayer !== lastWinnerMarker &&
+    gameOver
+  ) {
+    // I am the loser: this button is "Ready"
+    clearLocalBoardOnly();
+    resetBtn.disabled = true;  // I can't spam it
+
+    try {
+      await fetch("/api/ready", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: onlineRoomId,
+          player: onlinePlayer,
+        }),
+      });
+    } catch (err) {
+      console.error("Error sending ready state:", err);
+    }
+
+    if (messageText) {
+      messageText.textContent = "Ready. Waiting for opponent to start a new match.";
+    }
+    return;
+  }
+
+  // Everyone else → normal reset logic (winner, local modes, etc.)
+  resetBoard();
+});
+
 clearScoreBtn.addEventListener("click", clearScores);
 
 if (avToggleBtn) {
@@ -1057,7 +1262,7 @@ themeToggleBtn.addEventListener("click", () => {
 
 (async function autoJoinFromUrl() {
   try {
-    const params = new URLSearchParams(window.location.search);
+    const params      = new URLSearchParams(window.location.search);
     const prefillRoom = params.get("room");
     if (!prefillRoom) return;
 
@@ -1078,7 +1283,7 @@ themeToggleBtn.addEventListener("click", () => {
 
     const ok = await joinRoomByCode(prefillRoom);
     if (ok) {
-      // joinRoomByCode already started polling + set status
+      // polling + status already handled in joinRoomByCode
     }
   } catch (e) {
     console.error("Auto-join error:", e);

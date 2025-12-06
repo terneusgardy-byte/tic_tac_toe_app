@@ -95,10 +95,15 @@ def create_room():
             "X": "host",   # creator
             "O": None,     # will be 'guest' when someone joins
         },
-        "status": "waiting",   # 'waiting' -> 'in_progress' -> 'finished'
+        # status: 'waiting' -> 'in_progress' -> 'finished' or 'closed'
+        "status": "waiting",
         "winner": None,
         "last_move_by": None,
         "created_at": time.time(),
+        # Ready flags per player (for "Ready" button between matches)
+        "ready": {"X": False, "O": False},
+        # Who closed the room (for info)
+        "closed_by": None,
     }
 
     return jsonify(
@@ -129,8 +134,9 @@ def join_room():
     if not room:
         return jsonify(error="Room not found"), 404
 
-    if room["status"] == "finished":
-        return jsonify(error="Game already finished"), 400
+    # Block joining closed/finished rooms
+    if room["status"] in ("finished", "closed"):
+        return jsonify(error="Game already finished or closed"), 400
 
     if room["players"]["O"] is not None:
         return jsonify(error="Room already has two players"), 400
@@ -138,6 +144,9 @@ def join_room():
     # Mark that an opponent joined
     room["players"]["O"] = "guest"
     room["status"] = "in_progress"
+
+    # Reset ready flags on fresh join (just in case)
+    room["ready"] = {"X": False, "O": False}
 
     return jsonify(
         room_id=room_id,
@@ -151,7 +160,10 @@ def room_state(room_id):
     """
     Get the current state of a room.
     Response:
-      { room_id, board, current_turn, status, winner, last_move_by }
+      {
+        room_id, board, current_turn, status, winner, last_move_by,
+        ready_X, ready_O, closed_by
+      }
     """
     cleanup_rooms()
 
@@ -159,7 +171,10 @@ def room_state(room_id):
     if not room:
         return jsonify(error="Room not found"), 404
 
-    # We don't send the 'players' map yet, can add later if needed
+    ready = room.get("ready", {})
+    ready_x = bool(ready.get("X", False))
+    ready_o = bool(ready.get("O", False))
+
     return jsonify(
         room_id=room["room_id"],
         board=room["board"],
@@ -167,6 +182,9 @@ def room_state(room_id):
         status=room["status"],
         winner=room["winner"],
         last_move_by=room["last_move_by"],
+        ready_X=ready_x,
+        ready_O=ready_o,
+        closed_by=room.get("closed_by"),
     )
 
 
@@ -201,10 +219,11 @@ def make_move():
 
     # Ensure both players are present
     if room["players"]["X"] is None or room["players"]["O"] is None:
-        return jsonify(ok=False, error="Waiting for opponent"), 400
+      return jsonify(ok=False, error="Waiting for opponent"), 400
 
-    if room["status"] == "finished":
-        return jsonify(ok=False, error="Game already finished"), 400
+    # Block moves if finished or closed
+    if room["status"] in ("finished", "closed"):
+        return jsonify(ok=False, error="Game already finished or closed"), 400
 
     board = room["board"]
 
@@ -226,6 +245,8 @@ def make_move():
     else:
         room["winner"] = winner
         room["status"] = "finished"
+        # When a game finishes, clear ready flags for next round
+        room["ready"] = {"X": False, "O": False}
 
     return jsonify(
         ok=True,
@@ -236,9 +257,13 @@ def make_move():
         last_move_by=room["last_move_by"],
     )
 
+
 @app.route("/api/reset_room", methods=["POST"])
 def reset_room():
-    data = request.get_json(force=True)
+    """
+    Winner (or either on draw) triggers full server reset of the board.
+    """
+    data = request.get_json(force=True) or {}
     room_id = (data.get("room_id") or "").upper()
     start_player = data.get("start_player") or "X"
 
@@ -252,6 +277,8 @@ def reset_room():
     room["status"] = "in_progress"  # don't stay in 'waiting'
     room["winner"] = None
     room["last_move_by"] = None
+    room["ready"] = {"X": False, "O": False}
+    room["closed_by"] = None
 
     return jsonify({
         "ok": True,
@@ -260,6 +287,65 @@ def reset_room():
         "board": room["board"],
         "status": room["status"],
     })
+
+
+# -----------------------------------------
+# NEW: Mark a player as "ready" after loss
+# -----------------------------------------
+
+@app.route("/api/ready", methods=["POST"])
+def api_ready():
+    """
+    Mark a given player in a room as 'ready' for the next match.
+    Body:
+      { "room_id": "ABC123", "player": "X" or "O" }
+    """
+    data = request.get_json(force=True) or {}
+    room_id = (data.get("room_id") or "").upper()
+    player = data.get("player")
+
+    if not room_id or player not in ("X", "O"):
+        return jsonify(error="Invalid payload"), 400
+
+    room = rooms.get(room_id)
+    if not room:
+        return jsonify(error="Room not found"), 404
+
+    if "ready" not in room:
+        room["ready"] = {"X": False, "O": False}
+
+    room["ready"][player] = True
+
+    return jsonify(ok=True)
+
+
+# -----------------------------------------
+# NEW: Player leaves the room ("Stop" button)
+# -----------------------------------------
+
+@app.route("/api/leave_room", methods=["POST"])
+def leave_room():
+    """
+    A player leaves the online room (hits Stop).
+    Body:
+      { "room_id": "ABC123", "player": "X" or "O" }
+    """
+    data = request.get_json(force=True) or {}
+    room_id = (data.get("room_id") or "").upper()
+    player = data.get("player")
+
+    room = rooms.get(room_id)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+
+    # Optional: remember who closed it (for logging / debugging)
+    room["closed_by"] = player
+
+    # 🔥 Key part: remove the room so the other client gets 404 on room_state
+    rooms.pop(room_id, None)
+
+    return jsonify({"ok": True})
+
 
 # -----------------------------------------
 # MAIN ENTRY

@@ -203,16 +203,42 @@ body {
   text-shadow: 0 0 18px rgba(59,130,246,0.55);
 }
 
+/* Winning cells – keep glowing until board is cleared */
 .cell.winning {
-  background: radial-gradient(circle, #facc15 0, #f97316 40%, #020617 100%);
+  position: relative;
+  background: radial-gradient(circle at center,
+    rgba(250, 204, 21, 0.35),
+    rgba(249, 115, 22, 0.10) 65%,
+    #020617 100%
+  );
   border-color: #fbbf24;
+  box-shadow:
+    0 0 18px rgba(250, 204, 21, 0.9),
+    0 0 32px rgba(249, 115, 22, 0.7);
+  transform: scale(1.04);
+  animation: winPulse 0.28s ease-out;   /* small pop, glow stays */
 }
 
-/* Winning cells in LIGHT mode */
+/* Winning cells in LIGHT mode – same idea, brighter */
 body.light-mode .cell.winning {
-  background: radial-gradient(circle, #fde047 0, #fb923c 45%, #f97316 70%, #fefce8 100%);
+  position: relative;
+  background: radial-gradient(circle at center,
+    rgba(253, 224, 71, 0.55),
+    rgba(251, 146, 60, 0.25) 65%,
+    #fefce8 100%
+  );
   border-color: #fbbf24;
-  box-shadow: 0 0 24px rgba(249, 115, 22, 0.55);
+  box-shadow:
+    0 0 22px rgba(249, 115, 22, 0.7),
+    0 0 38px rgba(251, 191, 36, 0.8);
+  transform: scale(1.04);
+  animation: winPulse 0.28s ease-out;
+}
+
+@keyframes winPulse {
+  0%   { transform: scale(1.0); }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1.04); }
 }
 
 .controls {
@@ -531,4 +557,100 @@ body.light-mode .diff-active {
   font-size: 0.7rem !important;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+/* =========================================
+   EMOJI PULSE GLOW (TITLE CONTROLLERS)
+   ========================================= */
+
+.pulse-emoji {
+  display: inline-block;
+  animation: emojiPulse 2.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Bigger pulse + soft neon glow at the peak */
+@keyframes emojiPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    text-shadow: 0 0 0 rgba(0, 255, 180, 0);
+  }
+  50% {
+    transform: scale(1.22); /* was 1.15 → bigger pulse */
+    opacity: 0.9;
+    text-shadow:
+      0 0 6px rgba(0, 255, 180, 0.8),
+      0 0 12px rgba(0, 200, 255, 0.7);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    text-shadow: 0 0 0 rgba(0, 255, 180, 0);
+  }
+}
+
+/* =========================================
+   TITLE NEON GRADIENT + SOFT FLICKER
+   ========================================= */
+
+.title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  /* Gradient text */
+  background: linear-gradient(120deg, #7afcff, #35ff69, #fff35c);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  /* Slow shimmer / flicker */
+  animation: titleNeon 6s ease-in-out infinite;
+}
+
+/* Slow shimmer + glow, not a crazy strobe */
+@keyframes titleNeon {
+  0% {
+    filter: none;
+    text-shadow: none;
+    background-position: 0% 50%;
+  }
+  35% {
+    filter: brightness(1.1);
+    text-shadow:
+      0 0 6px rgba(0, 255, 180, 0.5),
+      0 0 14px rgba(0, 200, 255, 0.4);
+    background-position: 40% 50%;
+  }
+  50% {
+    filter: brightness(1.2);
+    text-shadow:
+      0 0 8px rgba(0, 255, 220, 0.7),
+      0 0 18px rgba(0, 200, 255, 0.6);
+    background-position: 60% 50%;
+  }
+  100% {
+    filter: none;
+    text-shadow: none;
+    background-position: 100% 50%;
+  }
+}
+
+/* prevent title neon from affecting emoji controllers */
+.title .pulse-emoji {
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+
+  /* this is the key: make them visible again */
+  -webkit-text-fill-color: initial !important;
+  color: #fff !important;
+
+  /* force their own pulse animation, not the title's */
+  animation: emojiPulse 2.5s ease-in-out infinite !important;
+
+  /* don't inherit title's filter/glow */
+  filter: none !important;
+  mix-blend-mode: normal !important;
 }
