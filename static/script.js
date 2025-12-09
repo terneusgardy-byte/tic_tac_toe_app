@@ -1248,10 +1248,10 @@ if (avToggleBtn) {
 function applyTheme(mode) {
   if (mode === "light") {
     document.body.classList.add("light-mode");
-    themeToggleBtn.textContent = "🌙 Dark";
+    themeToggleBtn.textContent = "🌙";  // when in light theme (background light)
   } else {
     document.body.classList.remove("light-mode");
-    themeToggleBtn.textContent = "☀️ Light";
+    themeToggleBtn.textContent = "☀️";  // when in dark theme (background dark)
   }
   localStorage.setItem("ttt_theme", mode);
 }

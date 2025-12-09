@@ -491,7 +491,8 @@ body.light-mode .diff-active {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  transform: translateY(-4px); /* nudges upward */
 }
 
 /* Keep mode buttons from shrinking */
@@ -574,19 +575,19 @@ body.light-mode .diff-active {
   0% {
     transform: scale(1);
     opacity: 1;
-    text-shadow: 0 0 0 rgba(0, 255, 180, 0);
+    text-shadow: none;
   }
-  50% {
-    transform: scale(1.22); /* was 1.15 → bigger pulse */
-    opacity: 0.9;
+  45% {
+    transform: scale(1.38); /* smooth peak */
+    opacity: 1;
     text-shadow:
-      0 0 6px rgba(0, 255, 180, 0.8),
-      0 0 12px rgba(0, 200, 255, 0.7);
+      0 0 8px rgba(0, 255, 200, 0.7),
+      0 0 18px rgba(0, 200, 255, 0.6);
   }
   100% {
     transform: scale(1);
     opacity: 1;
-    text-shadow: 0 0 0 rgba(0, 255, 180, 0);
+    text-shadow: none;
   }
 }
 
@@ -653,7 +654,7 @@ body.light-mode .diff-active {
   /* don't inherit title's filter/glow */
   filter: none !important;
   mix-blend-mode: normal !important;
-}
+}p
 
 /* QUICK FIX: Prevent controls from wrapping or shifting */
 .top-controls, .mode-buttons, .toggle-buttons {
